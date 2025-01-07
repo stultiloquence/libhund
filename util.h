@@ -5,7 +5,8 @@
 #include <iostream>
 #include <vector>
 
-void print_vector(std::vector<unsigned long> v) {
+template <typename T>
+void print_vector(std::vector<T> v) {
 	for (size_t i = 0; i < v.size(); i++) {
 		std::cout << v[i] << " ";
 	}

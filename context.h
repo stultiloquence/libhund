@@ -1,14 +1,17 @@
 #pragma once
 
+#include <climits>
 #include <filesystem>
 #include <iostream>
 #include <numeric>
 #include <variant>
 #include <vector>
 #include <thread>
+#include <fstream>
 
 #include <mtkahypar.h>
 #include <mtkahypartypes.h>
+#include "fast_matrix_market/fast_matrix_market.hpp"
 
 #include "types.h"
 #include "hypergraph_bisection.h"
@@ -39,7 +42,7 @@ struct HypergraphConfigManual {
 
 struct HypergraphConfigFromFile {
 	matrix_file_format_t file_format;
-	std::filesystem::path file_name;
+	std::filesystem::path file_path;
 };
 
 typedef std::variant<HypergraphConfigManual, HypergraphConfigFromFile> HypergraphConfig;
@@ -63,26 +66,81 @@ private:
 			std::thread::hardware_concurrency() /* use all available cores */,
 			true /* activate interleaved NUMA allocation policy */
 		);
-	 	mt_kahypar_initialized = true;
+		mt_kahypar_initialized = true;
 	}
 
 	static mt_kahypar_objective_t to_mt_kahypar_objective_function(
 		kahypar_objective_function_t objective_function
 	) {
 		switch (objective_function) {
-  		case HUND_KM1: return KM1;
-  		case HUND_CUT: return CUT;
-  		case HUND_SOED: return SOED;
-  		default:
-  			assert(false); // Should not happen.
-  			return KM1;
+		case HUND_KM1: return KM1;
+		case HUND_CUT: return CUT;
+		case HUND_SOED: return SOED;
+		default:
+			assert(false); // Should not happen.
+			return KM1;
 		}
+	}
+
+	void sort_by_col_first(
+		std::vector<unsigned long> rows,
+		std::vector<unsigned long> cols,
+		std::vector<unsigned long> &sorted_rows,
+		std::vector<unsigned long> &sorted_cols
+	) {
+		// Find sort permutation
+		auto perm = identity_permutation(rows.size());
+		std::sort(perm.begin(), perm.end(),
+			[&](std::size_t i, std::size_t j) {
+				if (cols[i] != cols[j]) {
+					return cols[i] < cols[j];
+				}
+				if (rows[i] != rows[j]) {
+					return rows[i] < rows[j];
+				}
+				return false;
+		 });
+
+		// Apply permutation
+		sorted_rows.reserve(rows.size());
+		std::transform(perm.begin(), perm.end(), std::back_inserter(sorted_rows), [&](auto i) { return rows[i]; });
+		sorted_cols.reserve(cols.size());
+		std::transform(perm.begin(), perm.end(), std::back_inserter(sorted_cols), [&](auto i) { return cols[i]; });
 	}
 
 	int load_hypergraph_from_matrix_file(
 		HypergraphConfigFromFile hcff
 	) {
-		return 0;
+		if (hcff.file_format == MATRIX_MARKET) {			
+			std::vector<unsigned long> rows, cols;
+			std::vector<double> vals;
+			unsigned long row_count = 0, col_count = 0;
+
+			std::ifstream matrix_file(hcff.file_path);
+			fast_matrix_market::read_matrix_market_triplet(
+				matrix_file,
+				row_count, col_count,
+				rows, cols, vals);
+
+			std::vector<unsigned long> sorted_rows, sorted_cols;
+			sort_by_col_first(rows, cols, sorted_rows, sorted_cols);
+	
+			hypergraph.vertex_count = row_count;
+			hypergraph.hyperedges = sorted_rows;
+
+			hypergraph.hyperedge_indices.reserve(col_count + 1);
+			hypergraph.hyperedge_indices.push_back(0);
+			unsigned int i = 0;
+			for (unsigned long col = 0; col < col_count; col++) {
+				while (i < sorted_cols.size() && sorted_cols[i] <= col) {
+					i++;
+				}
+				hypergraph.hyperedge_indices.push_back(i);
+			}
+			return 0;
+		} else {
+			throw std::runtime_error("Only MATRIX_MARKET format is supported right now.");
+		}
 	}
 
 	int load_hypergraph_directly(
@@ -222,5 +280,9 @@ public:
 
 	RowColPermutation run() {
 		return run(hypergraph, 0);
+	}
+
+	Hypergraph getHypergraph() {
+		return hypergraph;
 	}
 };
