@@ -24,22 +24,40 @@ std::vector<unsigned long> identity_permutation(
 }
 
 std::vector<unsigned long> combine_permutations(
+	unsigned long *first,
+	size_t first_size,
+	unsigned long *second,
+	size_t second_size,
+	unsigned long *third = nullptr,
+	size_t third_size = 0
+) {
+	std::vector<unsigned long> result;
+	result.reserve(first_size + second_size + third_size);
+	for (size_t i = 0; i < first_size; i++) {
+		result.push_back(first[i]);
+	}
+	for (size_t i = 0; i < second_size; i++) {
+		result.push_back(second[i] + first_size);
+	}
+	for (size_t i = 0; i < third_size; i++) {
+		result.push_back(third[i] + first_size + second_size);
+	}
+	return result;
+}
+
+std::vector<unsigned long> combine_permutations(
 	std::vector<unsigned long> first,
 	std::vector<unsigned long> second,
 	std::vector<unsigned long> third = std::vector<unsigned long>()
 ) {
-	std::vector<unsigned long> result;
-	result.reserve(first.size() + second.size() + third.size());
-	for (auto v : first) {
-		result.push_back(v);
-	}
-	for (auto v : second) {
-		result.push_back(v + first.size());
-	}
-	for (auto v : third) {
-		result.push_back(v + first.size() + second.size());
-	}
-	return result;
+	return combine_permutations(
+		&first[0],
+		first.size(),
+		&second[0],
+		second.size(),
+		third.empty() ? nullptr : &third[0],
+		third.size()
+	);
 }
 
 std::vector<unsigned long> compose_permutations(
