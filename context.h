@@ -359,12 +359,18 @@ private:
 		if (!(is_uneven && is_last_in_lower_half)) {
 			int partner = is_lower_half ? mpi_node_id + lower_half_size : mpi_node_id - lower_half_size;
 
-			MPI_Request *send_request;
+			MPI_Request send_request;
+
+			// printf("[Node %d] talking to %d, sending %zu entries, ready to receive %zu entries.\n", mpi_node_id, partner, own_permutations.size(), other_permutations.size());
+			// printf("[Node %d] Some addresses: %p %p %p", mpi_node_id, (void*) &own_permutations[0], (void*) &own_permutations, (void*) &send_request);
+
 			MPI_Isend(&own_permutations[0], own_permutations.size(), MPI_UNSIGNED_LONG,
-				partner, 1, MPI_COMM_ROOT, send_request);
+				partner, 1, MPI_COMM_ROOT, &send_request);
+			// printf("[Node %d] gabagoo\n", mpi_node_id);
+
 			MPI_Recv(&other_permutations[0], other_permutations_size, MPI_UNSIGNED_LONG,
 				partner, 1, MPI_COMM_ROOT, MPI_STATUS_IGNORE);
-			MPI_Wait(send_request, MPI_STATUS_IGNORE);	
+			MPI_Wait(&send_request, MPI_STATUS_IGNORE);	
 		}
 
 		if (is_uneven && is_last_in_upper_half) {
