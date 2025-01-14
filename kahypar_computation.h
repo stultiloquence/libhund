@@ -52,6 +52,15 @@ public:
 		return result;
 	}
 
+	RowColPermutation run(std::vector<int>) {
+		// todo
+		return {};
+	}
+
+	RowColPermutation run() {
+		return run(bisect());
+	}
+
 	unsigned long size_of_separator(
 		std::vector<int> partition
 	) {

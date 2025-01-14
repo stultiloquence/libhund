@@ -1,27 +1,29 @@
-done
+# done
 
 - quality 1: size of separators
 	- compare to that of mt-kahypar with 2^d blocks
-
-todo
-
-1. when attempting multiple bisections in parallel, what is the difference between the worst, the best, and average bisections?
-	- for different parameters / parameter variation to figure out a reasonable one
-2. performance:
+- when attempting multiple bisections in parallel, what is the difference between the worst, the best, and average bisections?
+- performance:
 	- compare with mt-kahypar with 2^d
-	- profiling of different parts of the code
 	- Catch2 BENCHMARK
-3. quality 2: relative increase in nnz (needs LU) -> compare with other libs
-4. Expand CLI
-5. Clean up repository
-6. Clean up build process
-7. Systematically run and evaluate and tweak using the tests
-8. Add additional correctnes tests
-	- empty hyperedges o__o
-9. Expand documentation and README
 
-optional
+# todo
 
+- Expand CLI
+- Clean up repository
+- Clean up build process
+- Systematically run and evaluate and tweak using the tests
+	- for different parameters / parameter variation to figure out a reasonable one
+- Add additional correctnes tests
+	- empty hyperedges o__o ^_^
+- Expand documentation and README
+- quality 2: relative increase in nnz (needs LU) -> compare with other libs
+
+# optional
+
+- performance test enhancement: profiling of different parts of the code
+- limit test output to 1 node by patching catch2.hpp
 - Use external library for local reordering (currently returning identity permutations)
 - Refactoring some overly complicated methods
+	- especially the part that niklas is puking at where we combine permutations in run_multi_node ._.
 - Support additional matrix formats

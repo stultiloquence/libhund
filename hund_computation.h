@@ -19,7 +19,8 @@
 
 struct Partition {
 	std::vector<int> partition;
-	double quality;
+	double quality; // Despite the name, smaller qualities indicate a better bisection
+	double true_imbalance;
 };
 
 class HUNDComputation {
@@ -74,19 +75,18 @@ private:
 				assert(false);
 			}
 
+			auto true_imbalance = mt_kahypar_imbalance(partitioned_hg, mt_kahypar_context);
 			mt_kahypar_free_hypergraph(mt_hypergraph);
 			mt_kahypar_free_partitioned_hypergraph(partitioned_hg);
 			return {
 				.partition = result,
-				.quality = quality
+				.quality = quality,
+				.true_imbalance = true_imbalance,
 			};
 		}
 
 		assert(false); // Should not happen;
-		return {
-			.partition = std::vector<int>(),
-			.quality = 0.0,
-		};
+		return {};
 	}
 
 	bool break_condition_reached(
@@ -101,6 +101,7 @@ private:
 			return hypergraph.get_vertex_count() <= bcc.max_block_size_inclusive || hypergraph.get_edge_count() <= bcc.max_block_size_inclusive;
 		} else {
 			// should not happen
+			assert(false);
 			return true;
 		}
 	}
@@ -117,9 +118,12 @@ private:
 		}
 
 		auto partition = HUNDComputation::bisect(hypergraph);
+
+		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, bisection_config, partition.partition, partition.quality, partition.true_imbalance);
+
 		auto hb = HypergraphBisection(partition.partition, hypergraph);
 
-		logger.log_bisection(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, hb);
+		logger.log_best_bisection(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, hb);
 
 		auto result_0 = run_single_node(hb.get_hypergraph_0(), recursion_depth + 1);
 		auto result_1 = run_single_node(hb.get_hypergraph_1(), recursion_depth + 1);
@@ -168,16 +172,18 @@ private:
 		// 2. compute partition and quality
 		auto partition = HUNDComputation::bisect(hypergraph);
 
+		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, bisection_config, partition.partition, partition.quality, partition.true_imbalance);
+
 		// 3. communicate qualities to all other nodes working on this bisection.
 		int range_size = range_end - range_start;
 		std::vector<double> qualities(range_size);
 		MPI_Allgather(&partition.quality, 1, MPI_DOUBLE,
 			&qualities[0], 1, MPI_DOUBLE, RANGE_COMM);
-		// 4. Figure out the node with the best partition (deterministically!)
-		double best_quality = -DBL_MAX;
+		// 4. Figure out the node with the best partition (deterministically!). Smaller qualities indicate a better bisection
+		double best_quality = DBL_MAX;
 		size_t best_node_id_within_RANGE_COMM = 0;
 		for (size_t i = 0; i < range_size; i++) {
-			if (qualities[i] > best_quality) {
+			if (qualities[i] < best_quality) {
 				best_quality = qualities[i];
 				best_node_id_within_RANGE_COMM = i;
 			}
@@ -187,7 +193,7 @@ private:
 
 		auto hb = HypergraphBisection(partition.partition, hypergraph);
 
-		logger.log_bisection(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, hb);
+		logger.log_best_bisection(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, hb);
 
 		Hypergraph own_hypergraph, other_hypergraph;
 		int sub_range_start, sub_range_end;
