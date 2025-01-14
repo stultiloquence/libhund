@@ -1,11 +1,13 @@
 #pragma once
 
-#include "types.h"
-#include <iostream>
+#include <hypergraph.h>
+#include <memory>
 
 class HypergraphBisection {
 
 private:
+	static const int partition_for_empty_edge = 0;
+
 	Hypergraph original_hypergraph;
 
 	size_t vertex_count;
@@ -38,12 +40,20 @@ private:
 	}
 
 	void compute_edge_vectors() {
-		edge_partition.reserve(edge_count);
-		edge_position_within_partition.reserve(edge_count);
+		edge_partition = std::vector<int>(edge_count);
+		edge_position_within_partition =  std::vector<unsigned long>(edge_count);
 
 		for (size_t i = 0; i < edge_count; i++) {
 			size_t edge_start = original_hypergraph.hyperedge_indices[i];
 			size_t edge_end = original_hypergraph.hyperedge_indices[i + 1];
+
+			if (edge_start == edge_end) {
+				// Empty hyperedges don't make much sense in the context of a hypergraph. However, our hypergraphs arise from matrices, where empty columns might exist. It is unclear where a empty hyperedge belongs, so we arbitrarily choose partition_for_empty_edge.
+				edge_partition[i] = partition_for_empty_edge;
+				edge_position_within_partition[i] = edge_partition_sizes[partition_for_empty_edge];
+				edge_partition_sizes[partition_for_empty_edge] += 1;
+				continue;
+			}
 
 			unsigned long first_vertex = original_hypergraph.hyperedges[edge_start];
 			
@@ -57,8 +67,8 @@ private:
 				}
 			}
 
-			edge_partition.push_back(hyperedge_partition);
-			edge_position_within_partition.push_back(edge_partition_sizes[hyperedge_partition]);
+			edge_partition[i] = hyperedge_partition;
+			edge_position_within_partition[i] = edge_partition_sizes[hyperedge_partition];
 			edge_partition_sizes[hyperedge_partition] += 1;
 		}
 	}
@@ -132,9 +142,7 @@ public:
 	HypergraphBisection(
 		std::vector<int> vert_partition,
 		Hypergraph hypergraph
-	) {
-		original_hypergraph = hypergraph;
-
+	) : original_hypergraph(hypergraph) {
 		vertex_count = original_hypergraph.get_vertex_count();
 		edge_count = original_hypergraph.get_edge_count();
 		vertex_partition = vert_partition;

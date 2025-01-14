@@ -39,9 +39,7 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:mt-kahypar/build/lib $MPIEXEC $FLAGS_MPI_BATCH 
 every time:
 
 ```
-mpicxx -std=c++17 test.cpp catch_amalgamated.a -o test -I.
-mpiexec -np 4 ./test // ignore random output from multiple nodes
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:mt-kahypar/build/lib mpicxx -std=c++17 test.cpp mt-kahypar/build/lib/libmtkahypar.so catch_amalgamated.a -o test -Imt-kahypar/include -I. -pthread
 
-mpiexec -np 1 ./test [1rank]
-mpiexec -np 2 ./test [2rank]
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:mt-kahypar/build/lib  mpiexec -np 2 ./test # ignore random output from multiple nodes
 ```

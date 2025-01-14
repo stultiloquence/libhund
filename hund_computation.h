@@ -2,168 +2,42 @@
 
 #include <cfloat>
 #include <climits>
-#include <filesystem>
 #include <variant>
 #include <vector>
-#include <thread>
-#include <fstream>
 #include <stdio.h>
 
 #include <mtkahypar.h>
 #include <mtkahypartypes.h>
-#include "fast_matrix_market/fast_matrix_market.hpp"
 #include <mpi.h>
 
-#include "types.h"
-#include "hypergraph_bisection.h"
-#include "util.h"
-
-struct BisectionConfigMtKahypar {
-	double max_imbalance;
-	kahypar_objective_function_t objective_function;
-};
-
-typedef std::variant<BisectionConfigMtKahypar> BisectionConfig;
-
-struct BreakConditionConfigRecursionDepth {
-	int depth;
-};
-
-struct BreakConditionConfigBlockSize {
-	int block_size;
-};
-
-typedef std::variant<BreakConditionConfigRecursionDepth, BreakConditionConfigBlockSize> BreakConditionConfig;
-
-struct HypergraphConfigManual {
-	size_t vertex_count;
-	std::vector<size_t> hyperedge_indices;
-	std::vector<unsigned long> hyperedges;
-};
-
-struct HypergraphConfigFromFile {
-	matrix_file_format_t file_format;
-	std::filesystem::path file_path;
-};
-
-typedef std::variant<HypergraphConfigManual, HypergraphConfigFromFile> HypergraphConfig;
+#include <hypergraph.h>
+#include <types.h>
+#include <hypergraph_bisection.h>
+#include <util.h>
+#include <logger.h>
+#include <initialize_mt_kahypar.h>
 
 struct Partition {
 	std::vector<int> partition;
 	double quality;
 };
 
-class Context {
+class HUNDComputation {
 
 private:
 	// Configuration Objects
 	BisectionConfig bisection_config;
 	BreakConditionConfig break_condition_config;
-	HypergraphConfig hypergraph_config;
+	Logger &logger;
 
-	inline static bool mt_kahypar_initialized = false;
 	mt_kahypar_context_t* mt_kahypar_context;
 
-	inline static bool mpi_initialized = false;
 	MPI_Comm MPI_COMM_ROOT;
 	int mpi_node_id;
 	int mpi_nr_of_nodes;
 
 	// Hypergraph Data
-	Hypergraph hypergraph;
-
-	void initialize_mt_kahypar() {
-		mt_kahypar_initialize(
-			std::thread::hardware_concurrency() /* use all available cores */,
-			true /* activate interleaved NUMA allocation policy */
-		);
-		mt_kahypar_initialized = true;
-	}
-
-	static mt_kahypar_objective_t to_mt_kahypar_objective_function(
-		kahypar_objective_function_t objective_function
-	) {
-		switch (objective_function) {
-		case HUND_KM1: return KM1;
-		case HUND_CUT: return CUT;
-		case HUND_SOED: return SOED;
-		default:
-			assert(false); // Should not happen.
-			return KM1;
-		}
-	}
-
-	void sort_by_col_first(
-		std::vector<unsigned long> rows,
-		std::vector<unsigned long> cols,
-		std::vector<unsigned long> &sorted_rows,
-		std::vector<unsigned long> &sorted_cols
-	) {
-		// Find sort permutation
-		auto perm = identity_permutation(rows.size());
-		std::sort(perm.begin(), perm.end(),
-			[&](std::size_t i, std::size_t j) {
-				if (cols[i] != cols[j]) {
-					return cols[i] < cols[j];
-				}
-				if (rows[i] != rows[j]) {
-					return rows[i] < rows[j];
-				}
-				return false;
-		 });
-
-		// Apply permutation
-		sorted_rows.reserve(rows.size());
-		std::transform(perm.begin(), perm.end(), std::back_inserter(sorted_rows), [&](auto i) { return rows[i]; });
-		sorted_cols.reserve(cols.size());
-		std::transform(perm.begin(), perm.end(), std::back_inserter(sorted_cols), [&](auto i) { return cols[i]; });
-	}
-
-	int load_hypergraph_from_matrix_file(
-		HypergraphConfigFromFile hcff
-	) {
-		if (hcff.file_format == MATRIX_MARKET) {			
-			std::vector<unsigned long> rows, cols;
-			std::vector<double> vals;
-			unsigned long row_count = 0, col_count = 0;
-
-			std::ifstream matrix_file(hcff.file_path);
-			fast_matrix_market::read_matrix_market_triplet(
-				matrix_file,
-				row_count, col_count,
-				rows, cols, vals);
-
-			std::vector<unsigned long> sorted_rows, sorted_cols;
-			sort_by_col_first(rows, cols, sorted_rows, sorted_cols);
-	
-			hypergraph.vertex_count = row_count;
-			hypergraph.hyperedges = sorted_rows;
-
-			hypergraph.hyperedge_indices.reserve(col_count + 1);
-			hypergraph.hyperedge_indices.push_back(0);
-			unsigned int i = 0;
-			for (unsigned long col = 0; col < col_count; col++) {
-				while (i < sorted_cols.size() && sorted_cols[i] <= col) {
-					i++;
-				}
-				hypergraph.hyperedge_indices.push_back(i);
-			}
-			return 0;
-		} else {
-			throw std::runtime_error("Only MATRIX_MARKET format is supported right now.");
-		}
-	}
-
-	int load_hypergraph_directly(
-		HypergraphConfigManual hcm
-	) {
-		hypergraph = {
-			.vertex_count = hcm.vertex_count,
-			.hyperedges = hcm.hyperedges,
-			.hyperedge_indices = hcm.hyperedge_indices,
-		};
-		return 0;
-	}
+	Hypergraph &hypergraph;
 
 	Partition bisect(
 		Hypergraph hypergraph
@@ -224,7 +98,7 @@ private:
 			return recursion_depth >= bcc.depth;
 		} else if (std::holds_alternative<BreakConditionConfigBlockSize>(break_condition_config)) {
 			auto bcc = std::get<BreakConditionConfigBlockSize>(break_condition_config);
-			return hypergraph.get_vertex_count() <= bcc.block_size || hypergraph.get_edge_count() <= bcc.block_size;
+			return hypergraph.get_vertex_count() <= bcc.max_block_size_inclusive || hypergraph.get_edge_count() <= bcc.max_block_size_inclusive;
 		} else {
 			// should not happen
 			return true;
@@ -242,8 +116,10 @@ private:
 			};
 		}
 
-		auto partition = Context::bisect(hypergraph);
+		auto partition = HUNDComputation::bisect(hypergraph);
 		auto hb = HypergraphBisection(partition.partition, hypergraph);
+
+		logger.log_bisection(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, hb);
 
 		auto result_0 = run_single_node(hb.get_hypergraph_0(), recursion_depth + 1);
 		auto result_1 = run_single_node(hb.get_hypergraph_1(), recursion_depth + 1);
@@ -290,7 +166,8 @@ private:
 
 		// todo: 1. figure out your node's bisection parameter variation
 		// 2. compute partition and quality
-		auto partition = Context::bisect(hypergraph);
+		auto partition = HUNDComputation::bisect(hypergraph);
+
 		// 3. communicate qualities to all other nodes working on this bisection.
 		int range_size = range_end - range_start;
 		std::vector<double> qualities(range_size);
@@ -306,9 +183,11 @@ private:
 			}
 		}
 		// 5. The winning node sends its partition, the others receive. Overwrites partition.partition. Relies on the fact that all partitions are of the same size.
-		MPI_Bcast(&partition.partition[0], partition.partition.size(), MPI_UNSIGNED_LONG, best_node_id_within_RANGE_COMM, RANGE_COMM);
+		MPI_Bcast(&partition.partition[0], partition.partition.size(), MPI_INT, best_node_id_within_RANGE_COMM, RANGE_COMM);
 
 		auto hb = HypergraphBisection(partition.partition, hypergraph);
+
+		logger.log_bisection(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, hb);
 
 		Hypergraph own_hypergraph, other_hypergraph;
 		int sub_range_start, sub_range_end;
@@ -350,7 +229,7 @@ private:
 		int other_permutations_size = other_hypergraph.get_edge_count() + other_hypergraph.get_vertex_count();
 		std::vector<unsigned long> other_permutations(other_permutations_size);
 		
-		printf("mpi_node_id = %i,\nrecursion_depth = %i,\nrange_start = %i,\nrange_end = %i,\nsub_range_start = %i,\nsub_range_end = %i,\nown_hypergraph.get_vertex_count() = %li,\nown_hypergraph.get_edge_count() = %li,\nown_permutations.size() = %li,\nother_hypergraph.get_vertex_count() = %li,\nother_hypergraph.get_edge_count() = %li,\nother_permutations.size() = %li\n", mpi_node_id, recursion_depth, range_start, range_end, sub_range_start, sub_range_end, own_hypergraph.get_vertex_count(), own_hypergraph.get_edge_count(), own_permutations.size(), other_hypergraph.get_vertex_count(), other_hypergraph.get_edge_count(), other_permutations.size());
+		// printf("mpi_node_id = %i,\nrecursion_depth = %i,\nrange_start = %i,\nrange_end = %i,\nsub_range_start = %i,\nsub_range_end = %i,\nown_hypergraph.get_vertex_count() = %li,\nown_hypergraph.get_edge_count() = %li,\nown_permutations.size() = %li,\nother_hypergraph.get_vertex_count() = %li,\nother_hypergraph.get_edge_count() = %li,\nother_permutations.size() = %li\n", mpi_node_id, recursion_depth, range_start, range_end, sub_range_start, sub_range_end, own_hypergraph.get_vertex_count(), own_hypergraph.get_edge_count(), own_permutations.size(), other_hypergraph.get_vertex_count(), other_hypergraph.get_edge_count(), other_permutations.size());
 
 		bool is_uneven = (range_end - range_start) % 2 == 1;
 		bool is_last_in_lower_half = mpi_node_id + 1 == range_midpoint;
@@ -366,11 +245,9 @@ private:
 
 			MPI_Isend(&own_permutations[0], own_permutations.size(), MPI_UNSIGNED_LONG,
 				partner, 1, MPI_COMM_ROOT, &send_request);
-			// printf("[Node %d] gabagoo\n", mpi_node_id);
-
 			MPI_Recv(&other_permutations[0], other_permutations_size, MPI_UNSIGNED_LONG,
 				partner, 1, MPI_COMM_ROOT, MPI_STATUS_IGNORE);
-			MPI_Wait(&send_request, MPI_STATUS_IGNORE);	
+			MPI_Wait(&send_request, MPI_STATUS_IGNORE);
 		}
 
 		if (is_uneven && is_last_in_upper_half) {
@@ -383,9 +260,9 @@ private:
 				range_end - 1, 1, MPI_COMM_ROOT, MPI_STATUS_IGNORE);
 		}
 
-		printf("mpi_node_id = %i has own permutation and other permutation:\n", mpi_node_id);
-		print_vector(own_permutations);
-		print_vector(other_permutations);
+		// printf("mpi_node_id = %i has own permutation and other permutation:\n", mpi_node_id);
+		// print_vector(own_permutations);
+		// print_vector(other_permutations);
 
 		std::vector<unsigned long> row_permutation, column_permutation;
 		if (is_lower_half) {
@@ -434,21 +311,18 @@ private:
 
 
 public:
-	Context(
+	HUNDComputation(
 		BisectionConfig bc,
 		BreakConditionConfig bcc,
-		HypergraphConfig hc
-	) {
+		Hypergraph &hypergraph,
+		Logger &logger
+	) : logger(logger), hypergraph(hypergraph) {
 		this->bisection_config = bc;
 		this->break_condition_config = bcc;
-		this->hypergraph_config = hc;
 
 		BisectionConfigMtKahypar *cmk = std::get_if<BisectionConfigMtKahypar>(&bc);
 		if (cmk) {
-			if (!mt_kahypar_initialized) {
-				initialize_mt_kahypar();
-			}
-			mt_kahypar_set_seed(42);
+			initialize_mt_kahypar();
 			mt_kahypar_context = mt_kahypar_context_new();
 			mt_kahypar_load_preset(mt_kahypar_context, DEFAULT);
 			mt_kahypar_set_partitioning_parameters(
@@ -460,25 +334,15 @@ public:
 			mt_kahypar_set_context_parameter(mt_kahypar_context, VERBOSE, "0");
 		}
 
-		if (std::holds_alternative<HypergraphConfigManual>(hc)) {
-			load_hypergraph_directly(std::get<HypergraphConfigManual>(hc));
-		} else if (std::holds_alternative<HypergraphConfigFromFile>(hc)) {
-			load_hypergraph_from_matrix_file(std::get<HypergraphConfigFromFile>(hc));
-		}
+		MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_ROOT);
+	    MPI_Comm_size(MPI_COMM_ROOT, &mpi_nr_of_nodes);
+	    MPI_Comm_rank(MPI_COMM_ROOT, &mpi_node_id);
 
-		if (!mpi_initialized) {
-			MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_ROOT);
-		    MPI_Comm_size(MPI_COMM_ROOT, &mpi_nr_of_nodes);
-		    MPI_Comm_rank(MPI_COMM_ROOT, &mpi_node_id);
-
-		    assert(1 <= mpi_nr_of_nodes);
-		    assert(0 <= mpi_node_id && mpi_node_id < mpi_nr_of_nodes);
-
-			mpi_initialized = true;
-		}
-
+	    assert(1 <= mpi_nr_of_nodes);
+	    assert(0 <= mpi_node_id && mpi_node_id < mpi_nr_of_nodes);
 	}
-	~Context() {
+
+	~HUNDComputation() {
 		if (std::holds_alternative<BisectionConfigMtKahypar>(bisection_config)) {
 			mt_kahypar_free_context(mt_kahypar_context);
 		}

@@ -1,7 +1,10 @@
 #pragma once
 
-#include <cstddef>
+#include <cassert>
+#include <variant>
 #include <vector>
+
+#include <mtkahypartypes.h>
 
 typedef enum KahyparObjectiveFunction {
   HUND_KM1,
@@ -9,27 +12,37 @@ typedef enum KahyparObjectiveFunction {
   HUND_SOED,
 } kahypar_objective_function_t;
 
-typedef enum MatrixFileFormat {
-  MATLAB,
-  RUTHERFORD_BOEING,
-  MATRIX_MARKET
-} matrix_file_format_t;
-
 struct RowColPermutation {
   std::vector<unsigned long> row_permutation;
   std::vector<unsigned long> column_permutation;
 };
 
-struct Hypergraph {
-  size_t vertex_count;
-  std::vector<unsigned long> hyperedges;
-  std::vector<size_t> hyperedge_indices;
-
-  size_t get_vertex_count() {
-    return vertex_count;
-  }
-
-  size_t get_edge_count() {
-    return hyperedge_indices.size() - 1;
-  }
+struct BisectionConfigMtKahypar {
+  double max_imbalance;
+  kahypar_objective_function_t objective_function;
 };
+
+typedef std::variant<BisectionConfigMtKahypar> BisectionConfig;
+
+struct BreakConditionConfigRecursionDepth {
+  int depth;
+};
+
+struct BreakConditionConfigBlockSize {
+  int max_block_size_inclusive;
+};
+
+typedef std::variant<BreakConditionConfigRecursionDepth, BreakConditionConfigBlockSize> BreakConditionConfig;
+
+mt_kahypar_objective_t to_mt_kahypar_objective_function(
+    kahypar_objective_function_t objective_function
+  ) {
+    switch (objective_function) {
+    case HUND_KM1: return KM1;
+    case HUND_CUT: return CUT;
+    case HUND_SOED: return SOED;
+    default:
+      assert(false); // Should not happen.
+      return KM1;
+    }
+  }
