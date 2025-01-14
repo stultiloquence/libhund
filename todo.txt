@@ -6,17 +6,18 @@
 - performance:
 	- compare with mt-kahypar with 2^d
 	- Catch2 BENCHMARK
+- Clean up repository
 
 # todo
 
 - Expand CLI
-- Clean up repository
-- Clean up build process
+	- save permutation vectors as txt files
 - Systematically run and evaluate and tweak using the tests
 	- for different parameters / parameter variation to figure out a reasonable one
-- Add additional correctnes tests
+- Add additional correctness tests
 	- empty hyperedges o__o ^_^
 - Expand documentation and README
+- Clean up build process
 - quality 2: relative increase in nnz (needs LU) -> compare with other libs
 
 # optional
