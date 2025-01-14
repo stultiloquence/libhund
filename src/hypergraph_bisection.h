@@ -1,7 +1,6 @@
 #pragma once
 
 #include <hypergraph.h>
-#include <memory>
 
 class HypergraphBisection {
 

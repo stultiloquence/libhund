@@ -2,7 +2,7 @@
 #include <mpi.h>
 #include <ostream>
 
-#include <include/CLI11.hpp>
+#include <CLI11/CLI11.hpp>
 #include <mtkahypar.h>
 
 #include <types.h>

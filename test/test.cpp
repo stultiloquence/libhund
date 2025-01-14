@@ -49,7 +49,7 @@ TEST_CASE("Time to run on real life matrix") {
     const int recursion_depth = 3;
     const int nr_of_blocks = pow(2, recursion_depth);
 
-    auto hypergraph = Hypergraph(MATRIX_MARKET, "real_world_matrices/fd18.mtx");
+    auto hypergraph = Hypergraph(MATRIX_MARKET, "../examples/fd18.mtx");
     auto kahypar_config = BisectionConfigMtKahypar {
         .max_imbalance = 0.03,
         .objective_function = HUND_KM1,
