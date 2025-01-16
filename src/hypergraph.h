@@ -10,8 +10,8 @@
 #include <util.h>
 
 typedef enum MatrixFileFormat {
-	MATLAB,
-	RUTHERFORD_BOEING,
+	// MATLAB,
+	// RUTHERFORD_BOEING,
 	MATRIX_MARKET
 } matrix_file_format_t;
 

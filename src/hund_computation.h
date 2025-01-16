@@ -62,13 +62,13 @@ private:
 			auto result = std::vector(partition.get(), partition.get() + hypergraph.get_vertex_count());
 			double quality;
 			switch (cmk->objective_function) {
-			case HUND_KM1:
+			case KahyparObjectiveFunction::KM1:
 				quality = mt_kahypar_km1(partitioned_hg);
 				break;
-			case HUND_CUT:
+			case KahyparObjectiveFunction::CUT:
 				quality = mt_kahypar_cut(partitioned_hg);
 				break;
-			case HUND_SOED:
+			case KahyparObjectiveFunction::SOED:
 				quality = mt_kahypar_soed(partitioned_hg);
 				break;
 			default:

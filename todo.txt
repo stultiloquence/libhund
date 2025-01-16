@@ -7,11 +7,11 @@
 	- compare with mt-kahypar with 2^d
 	- Catch2 BENCHMARK
 - Clean up repository
+- Expand CLI
+	- save permutation vectors as txt files
 
 # todo
 
-- Expand CLI
-	- save permutation vectors as txt files
 - Systematically run and evaluate and tweak using the tests
 	- for different parameters / parameter variation to figure out a reasonable one
 - Add additional correctness tests

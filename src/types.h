@@ -6,10 +6,10 @@
 
 #include <mtkahypartypes.h>
 
-typedef enum KahyparObjectiveFunction {
-  HUND_KM1,
-  HUND_CUT,
-  HUND_SOED,
+typedef enum class KahyparObjectiveFunction {
+  KM1,
+  CUT,
+  SOED,
 } kahypar_objective_function_t;
 
 struct RowColPermutation {
@@ -22,6 +22,10 @@ struct BisectionConfigMtKahypar {
   kahypar_objective_function_t objective_function;
 };
 
+enum BisectionConfigVariant {
+  MT_KAHYPAR
+};
+
 typedef std::variant<BisectionConfigMtKahypar> BisectionConfig;
 
 struct BreakConditionConfigRecursionDepth {
@@ -32,15 +36,20 @@ struct BreakConditionConfigBlockSize {
   int max_block_size_inclusive;
 };
 
+enum BreakConditionVariant {
+  RECURSION_DEPTH,
+  BLOCK_SIZE,
+};
+
 typedef std::variant<BreakConditionConfigRecursionDepth, BreakConditionConfigBlockSize> BreakConditionConfig;
 
 mt_kahypar_objective_t to_mt_kahypar_objective_function(
     kahypar_objective_function_t objective_function
   ) {
     switch (objective_function) {
-    case HUND_KM1: return KM1;
-    case HUND_CUT: return CUT;
-    case HUND_SOED: return SOED;
+    case KahyparObjectiveFunction::KM1: return KM1;
+    case KahyparObjectiveFunction::CUT: return CUT;
+    case KahyparObjectiveFunction::SOED: return SOED;
     default:
       assert(false); // Should not happen.
       return KM1;
