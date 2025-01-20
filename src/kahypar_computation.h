@@ -14,9 +14,10 @@ public:
 	KahyparComputation(
 		BisectionConfigMtKahypar config,
 		int nr_of_blocks,
+		MultithreadingConfig mc,
 		Hypergraph &hypergraph
 	) : hypergraph(hypergraph), config(config) {
-		initialize_mt_kahypar();
+		initialize_mt_kahypar(mc.number_of_threads_per_rank);
 
 		mt_kahypar_context = mt_kahypar_context_new();
 		mt_kahypar_load_preset(mt_kahypar_context, DEFAULT);

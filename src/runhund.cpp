@@ -25,7 +25,8 @@ void print_vector_to_stream(std::vector<T> v, std::ostream &os) {
 void run_separator_size_test(
 	Hypergraph hypergraph,
 	BisectionConfig bisection_config,
-	BreakConditionConfig break_condition_config
+	BreakConditionConfig break_condition_config,
+	MultithreadingConfig multithreading_config
 ) {
 	// Get the configuration right.
 	BisectionConfigMtKahypar *cmk = std::get_if<BisectionConfigMtKahypar>(&bisection_config);
@@ -47,6 +48,7 @@ void run_separator_size_test(
 	auto hund_computation = HUNDComputation(
 		*cmk,
 		*crd,
+		multithreading_config,
 		hypergraph,
 		logger
 	);
@@ -55,7 +57,12 @@ void run_separator_size_test(
 	auto hund_size = logger.get_total_separator_size();
 
 	// Run KahyparComputation.
-	KahyparComputation kahypar_computation(*cmk, nr_of_blocks, hypergraph);
+	KahyparComputation kahypar_computation(
+		*cmk,
+		nr_of_blocks,
+		multithreading_config,
+		hypergraph
+	);
 	auto kahypar_size = kahypar_computation.size_of_separator();
 
 	// Print results.
@@ -69,7 +76,8 @@ void run_separator_size_test(
 void run_bisection_test(
 	Hypergraph hypergraph,
 	BisectionConfig bisection_config,
-	BreakConditionConfig break_condition_config
+	BreakConditionConfig break_condition_config,
+	MultithreadingConfig multithreading_config
 ) {
 	// Print initial info.
 	int node_id;
@@ -84,6 +92,7 @@ void run_bisection_test(
 	auto hund_computation = HUNDComputation(
 		bisection_config,
 		break_condition_config,
+		multithreading_config,
 		hypergraph,
 		logger
 	);
@@ -113,6 +122,7 @@ void run_run(
 	Hypergraph hypergraph,
 	BisectionConfig bisection_config,
 	BreakConditionConfig break_condition_config,
+	MultithreadingConfig multithreading_config,
 	OutputType output_type,
 	std::string row_perm_file,
 	std::string col_perm_file
@@ -121,6 +131,7 @@ void run_run(
 	auto hund_computation = HUNDComputation(
 		bisection_config,
 		break_condition_config,
+		multithreading_config,
 		hypergraph,
 		logger
 	);
@@ -162,6 +173,10 @@ int main(int argc, char** argv) {
 
     CLI::App app{"HUND CLI"};
     argv = app.ensure_utf8(argv);
+
+    int threads_per_rank;
+    app.add_option("-t,--threads-per-rank", threads_per_rank, "Number of threads per MPI rank. Required. Must be at least 2.")
+    	->required(true);
 
     std::string matrix_file = "matrix.mtx";
     app.add_option("-f,--matrix-file", matrix_file, "File path of the input matrix file.")
@@ -248,6 +263,10 @@ int main(int argc, char** argv) {
 
 	Hypergraph hypergraph = Hypergraph(matrix_file_format, matrix_file);
 
+	MultithreadingConfig multithreading_config = {
+		.number_of_threads_per_rank = threads_per_rank
+	};
+
     BisectionConfig bisection_config;
     switch (bisection_config_variant) {
     case MT_KAHYPAR:
@@ -279,11 +298,11 @@ int main(int argc, char** argv) {
     // 4. Run actual command.
 
     if (app.got_subcommand(separator_size_test)) {
-    	run_separator_size_test(hypergraph, bisection_config, break_condition_config);
+    	run_separator_size_test(hypergraph, bisection_config, break_condition_config, multithreading_config);
     } else if (app.got_subcommand(bisection_test)) {
-    	run_bisection_test(hypergraph, bisection_config, break_condition_config);
+    	run_bisection_test(hypergraph, bisection_config, break_condition_config, multithreading_config);
     } else if (app.got_subcommand(run)) {
-    	run_run(hypergraph, bisection_config, break_condition_config, output_type, row_perm_file, col_perm_file);
+    	run_run(hypergraph, bisection_config, break_condition_config, multithreading_config, output_type, row_perm_file, col_perm_file);
     }
 
     MPI_Finalize();

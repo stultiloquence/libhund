@@ -55,3 +55,7 @@ mt_kahypar_objective_t to_mt_kahypar_objective_function(
       return KM1;
     }
   }
+
+  struct MultithreadingConfig {
+    int number_of_threads_per_rank;
+  };

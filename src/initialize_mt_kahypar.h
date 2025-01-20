@@ -1,14 +1,15 @@
 #pragma once
 
 #include <mtkahypar.h>
-#include <thread>
 
 bool __mt_kahypar_initialized = false;
 
-void initialize_mt_kahypar() {
+void initialize_mt_kahypar(
+	int nr_of_threads
+) {
 	if (!__mt_kahypar_initialized) {
 		mt_kahypar_initialize(
-			std::thread::hardware_concurrency() /* use all available cores */,
+			nr_of_threads,
 			true /* activate interleaved NUMA allocation policy */
 		);
 		__mt_kahypar_initialized = true;

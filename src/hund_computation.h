@@ -320,6 +320,7 @@ public:
 	HUNDComputation(
 		BisectionConfig bc,
 		BreakConditionConfig bcc,
+		MultithreadingConfig mc,
 		Hypergraph &hypergraph,
 		Logger &logger
 	) : logger(logger), hypergraph(hypergraph) {
@@ -328,7 +329,7 @@ public:
 
 		BisectionConfigMtKahypar *cmk = std::get_if<BisectionConfigMtKahypar>(&bc);
 		if (cmk) {
-			initialize_mt_kahypar();
+			initialize_mt_kahypar(mc.number_of_threads_per_rank);
 			mt_kahypar_context = mt_kahypar_context_new();
 			mt_kahypar_load_preset(mt_kahypar_context, DEFAULT);
 			mt_kahypar_set_partitioning_parameters(
