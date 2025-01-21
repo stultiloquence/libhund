@@ -174,9 +174,9 @@ int main(int argc, char** argv) {
     CLI::App app{"HUND CLI"};
     argv = app.ensure_utf8(argv);
 
-    int threads_per_rank;
-    app.add_option("-t,--threads-per-rank", threads_per_rank, "Number of threads per MPI rank. Required. Must be at least 2.")
-    	->required(true);
+    int threads_per_rank = 0;
+    app.add_option("-t,--threads-per-rank", threads_per_rank, "Number of threads per MPI rank. Default is 0, which means use the maximum number available.")
+    	->check(CLI::NonNegativeNumber);
 
     std::string matrix_file = "matrix.mtx";
     app.add_option("-f,--matrix-file", matrix_file, "File path of the input matrix file.")
