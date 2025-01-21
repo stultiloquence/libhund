@@ -10,21 +10,27 @@
 - Expand CLI
 	- save permutation vectors as txt files
 
-# todo
+# todos from more likely to less likely
+
+- Donnerstag
+	- run on cluster for test results
+	- do the presentation
+- Freitag, Samstag
+	- Add additional correctness tests
+		- empty hyperedges
+	- Expand documentation and README
+	- Clean up build process
+	- Refactoring some overly complicated methods
+		- especially the part that niklas is puking at where we combine permutations in run_multi_node ._.
+- Sonntag, Montag, Mittwoch
+	- the report
+- Donnerstag, Freitag
+	- getting it working on >1 node
 
 - Systematically run and evaluate and tweak using the tests
 	- for different parameters / parameter variation to figure out a reasonable one
-- Add additional correctness tests
-	- empty hyperedges o__o ^_^
-- Expand documentation and README
-- Clean up build process
+	- on cluster
 - quality 2: relative increase in nnz (needs LU) -> compare with other libs
-
-# optional
-
 - performance test enhancement: profiling of different parts of the code
-- limit test output to 1 node by patching catch2.hpp
 - Use external library for local reordering (currently returning identity permutations)
-- Refactoring some overly complicated methods
-	- especially the part that niklas is puking at where we combine permutations in run_multi_node ._.
 - Support additional matrix formats

@@ -9,11 +9,7 @@ libhund can be used either locally or on the HPC cluster.
 ### HPC Cluster
 
 ```
-module load GCC/11.3.0
-module load Boost/1.79.0
-module load tbb/2021.5.0
-module load hwloc/2.7.1
-module load OpenMPI/4.1.4
+module load GCC/11.3.0 Boost/1.79.0 tbb/2021.5.0 hwloc/2.7.1 OpenMPI/4.1.4
 
 # install https://github.com/kahypar/mt-kahypar into mt-kahypar. build as a library. see their readme.md
 
