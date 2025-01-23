@@ -114,18 +114,22 @@ struct BisectionAttempt {
 	int node_id;
 	int range_start;
 	int range_end;
+	size_t vertex_count;
+	size_t edge_count;
 	double max_imbalance;
 	double quality;
 	double true_imbalance;
-	double relative_separator_size;
+	size_t separator_size;
 	bool operator==(const BisectionAttempt &rhs) {
 		return this->node_id == rhs.node_id
 			&& this->range_start == rhs.range_start
 			&& this->range_end == rhs.range_end
+			&& this->vertex_count == rhs.vertex_count
+			&& this->edge_count == rhs.edge_count
 			&& this->max_imbalance == rhs.max_imbalance
 			&& this->quality == rhs.quality
 			&& this->true_imbalance == rhs.true_imbalance
-			&& this->relative_separator_size == rhs.relative_separator_size;
+			&& this->separator_size == rhs.separator_size;
 	}
 };
 
@@ -133,13 +137,27 @@ struct BisectionAttempts {
 	int recursion_depth;
 	int range_start;
 	int range_end;
+	size_t vertex_count;
+	size_t edge_count;
 	std::vector<double> max_imbalances;
 	std::vector<double> qualities;
 	std::vector<double> true_imbalances;
-	std::vector<double> relative_separator_sizes;
+	std::vector<size_t> separator_sizes;
 };
 
 void print_as_json(std::vector<double> v, std::ostream &os) {
+	if (v.size() == 0) {
+		os << "[]";
+		return;
+	}
+	os << "[";
+	for (size_t i = 0; i < v.size() - 1; i++) {
+		os << v[i] << ", ";
+	}
+	os << v[v.size() - 1] << "]";
+}
+
+void print_as_json(std::vector<size_t> v, std::ostream &os) {
 	if (v.size() == 0) {
 		os << "[]";
 		return;
@@ -156,6 +174,8 @@ void print_as_json(BisectionAttempts bisection_attempts, std::ostream &os) {
 	os << "    \"recursion_depth\": " << bisection_attempts.recursion_depth << ",\n";
 	os << "    \"range_start\": " << bisection_attempts.range_start << ",\n";
 	os << "    \"range_end\": " << bisection_attempts.range_end << ",\n";
+	os << "    \"vertex_count\": " << bisection_attempts.vertex_count << ",\n";
+	os << "    \"edge_count\": " << bisection_attempts.edge_count << ",\n";
 	os << "    \"max_imbalances\": ";
 	print_as_json(bisection_attempts.max_imbalances, os);
 	os << ",\n";
@@ -165,8 +185,8 @@ void print_as_json(BisectionAttempts bisection_attempts, std::ostream &os) {
 	os << "    \"true_imbalances\": ";
 	print_as_json(bisection_attempts.true_imbalances, os);
 	os << ",\n";
-	os << "    \"relative_separator_sizes\": ";
-	print_as_json(bisection_attempts.relative_separator_sizes, os);
+	os << "    \"separator_sizes\": ";
+	print_as_json(bisection_attempts.separator_sizes, os);
 	os << "\n}";
 }
 
@@ -187,7 +207,7 @@ void print_as_json(std::vector<BisectionAttempts> &bas, std::ostream &os) {
 class BisectionQualityRangeLogger : public Logger {
 private:
 	constexpr static const BisectionAttempt null_value = {
-		-1, -1, -1, 0.0, 0.0, 0.0, 0.0
+		-1, -1, -1, 0, 0, 0.0, 0.0, 0.0, 0
 	};
 	int node_id = -1;
 	std::vector<BisectionAttempt> bisection_attempts_by_recursion_depth;
@@ -195,18 +215,30 @@ private:
 public:
 	BisectionQualityRangeLogger() {
 		// Create a type for struct BisectionAttempt.
-		const int nitems = 7;
-		int blocklengths[nitems] = {1, 1, 1, 1, 1, 1, 1};
-		MPI_Datatype types[nitems] = {MPI_INT, MPI_INT, MPI_INT, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE, MPI_DOUBLE};
+		const int nitems = 9;
+		int blocklengths[nitems] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+		MPI_Datatype types[nitems] = {
+			MPI_INT,
+			MPI_INT,
+			MPI_INT,
+			MPI_UNSIGNED_LONG,
+			MPI_UNSIGNED_LONG,
+			MPI_DOUBLE,
+			MPI_DOUBLE,
+			MPI_DOUBLE,
+			MPI_UNSIGNED_LONG
+		};
 		MPI_Aint offsets[nitems];
 
 		offsets[0] = offsetof(BisectionAttempt, node_id);
 		offsets[1] = offsetof(BisectionAttempt, range_start);
 		offsets[2] = offsetof(BisectionAttempt, range_end);
-		offsets[3] = offsetof(BisectionAttempt, max_imbalance);
-		offsets[4] = offsetof(BisectionAttempt, quality);
-		offsets[5] = offsetof(BisectionAttempt, true_imbalance);
-		offsets[6] = offsetof(BisectionAttempt, relative_separator_size);
+		offsets[3] = offsetof(BisectionAttempt, vertex_count);
+		offsets[4] = offsetof(BisectionAttempt, edge_count);
+		offsets[5] = offsetof(BisectionAttempt, max_imbalance);
+		offsets[6] = offsetof(BisectionAttempt, quality);
+		offsets[7] = offsetof(BisectionAttempt, true_imbalance);
+		offsets[8] = offsetof(BisectionAttempt, separator_size);
 
 		MPI_Type_create_struct(nitems, blocklengths, offsets, types, &MPI_BISECTION_ATTEMPT_TYPE);
 		MPI_Type_commit(&MPI_BISECTION_ATTEMPT_TYPE);
@@ -245,10 +277,12 @@ public:
 				.node_id = node_id,
 				.range_start = range_start,
 				.range_end = range_end,
+				.vertex_count = hypergraph.get_vertex_count(),
+				.edge_count = hypergraph.get_edge_count(),
 				.max_imbalance = cmk->max_imbalance,
 				.quality = partition_quality,
 				.true_imbalance = true_imbalance,
-				.relative_separator_size = ((double) hb.get_separator_size()) / hypergraph.get_edge_count(),
+				.separator_size = hb.get_separator_size(),
 			};
 		}
 	}
@@ -308,11 +342,13 @@ public:
 				next.max_imbalances.push_back(entry.max_imbalance);
 				next.qualities.push_back(entry.quality);
 				next.true_imbalances.push_back(entry.true_imbalance);
-				next.relative_separator_sizes.push_back(entry.relative_separator_size);
+				next.separator_sizes.push_back(entry.separator_size);
 				if (entry.range_end == entry.node_id + 1) {
 					next.recursion_depth = depth;
 					next.range_start = entry.range_start;
 					next.range_end = entry.range_end;
+					next.vertex_count = entry.vertex_count;
+					next.edge_count = entry.edge_count;
 					result.push_back(next);
 					next = BisectionAttempts{};
 				}
