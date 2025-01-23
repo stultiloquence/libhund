@@ -44,7 +44,9 @@ void run_separator_size_test(
 	}
 
 	// Run HUND algorithm.
-	SeparatorSizeLogger logger = SeparatorSizeLogger();
+	SeparatorSizeLogger logger = SeparatorSizeLogger(
+		crd->depth
+	);
 	auto hund_computation = HUNDComputation(
 		*cmk,
 		*crd,
@@ -55,6 +57,7 @@ void run_separator_size_test(
 	auto hund_result = hund_computation.run_multi_node();
 	logger.gather();
 	auto hund_size = logger.get_total_separator_size();
+	auto hund_size_weighted = logger.get_total_separator_size_weighted();
 
 	// Run KahyparComputation.
 	KahyparComputation kahypar_computation(
@@ -64,11 +67,14 @@ void run_separator_size_test(
 		hypergraph
 	);
 	auto kahypar_size = kahypar_computation.size_of_separator();
+	auto kahypar_km1 = kahypar_computation.get_km1();
 
 	// Print results.
 	if (node_id == 0) {
-		printf("HUND total size of separators: %lu\n", hund_size);
-		printf("MtKaHyPar size of separator:   %lu\n", kahypar_size);
+		printf("HUND total size of separators:          %lu\n", hund_size);
+		printf("HUND total size of separators weighted: %lu\n", hund_size_weighted);
+		printf("MtKaHyPar size of separator:            %lu\n", kahypar_size);
+		printf("MtKaHyPar KM1:                          %f\n", kahypar_km1);
 	}
 }
 

@@ -10,6 +10,7 @@ private:
 	BisectionConfigMtKahypar config;
 	mt_kahypar_context_t* mt_kahypar_context;
 	Hypergraph &hypergraph;
+	double km1;
 public:
 	KahyparComputation(
 		BisectionConfigMtKahypar config,
@@ -41,6 +42,7 @@ public:
 			nullptr
 		);
 		auto partitioned_hg = mt_kahypar_partition(mt_hypergraph, mt_kahypar_context);
+		km1 = mt_kahypar_km1(partitioned_hg);
 
 		auto partition = std::make_unique<mt_kahypar_partition_id_t[]>(mt_kahypar_num_hypernodes(mt_hypergraph));
 		mt_kahypar_get_partition(partitioned_hg, partition.get());
@@ -91,6 +93,10 @@ public:
 
 	unsigned long size_of_separator() {
 		return size_of_separator(bisect());
+	}
+
+	double get_km1() {
+		return km1;
 	}
 
 	~KahyparComputation() {

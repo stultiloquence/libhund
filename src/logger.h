@@ -58,8 +58,14 @@ public:
 
 class SeparatorSizeLogger : public Logger {
 private:
+	int total_recursion_depth;
+	unsigned long total_separator_size_weighted = 0;
 	unsigned long total_separator_size = 0;
 public:
+	SeparatorSizeLogger(
+		int total_recursion_depth
+	) : total_recursion_depth(total_recursion_depth) {};
+
 	void log_potential_partition(
 		int node_id,
 		Hypergraph &hypergraph,
@@ -81,6 +87,7 @@ public:
 		HypergraphBisection &hb
 	) override {
 		if (node_id == range_start) {
+			total_separator_size_weighted += hb.get_separator_size() * std::pow(2, total_recursion_depth - recursion_depth);
 			total_separator_size += hb.get_separator_size();
 		}
 	}
@@ -94,15 +101,26 @@ public:
 		MPI_Comm_size(MPI_COMM_SEPARATOR_SIZE, &world_size);
 		MPI_Comm_rank(MPI_COMM_SEPARATOR_SIZE, &node_id);
 
-		std::vector<unsigned long> total_sizes(world_size);
+		std::vector<unsigned long> total_sizes_weighted(world_size);
 
+		MPI_Allgather(&total_separator_size_weighted, 1, MPI_UNSIGNED_LONG,
+			&total_sizes_weighted[0], 1, MPI_UNSIGNED_LONG, MPI_COMM_SEPARATOR_SIZE);
+		total_separator_size_weighted = 0;
+		for (auto size : total_sizes_weighted) {
+			total_separator_size_weighted += size;
+		}
+
+		std::vector<unsigned long> total_sizes(world_size);
 		MPI_Allgather(&total_separator_size, 1, MPI_UNSIGNED_LONG,
 			&total_sizes[0], 1, MPI_UNSIGNED_LONG, MPI_COMM_SEPARATOR_SIZE);
-
 		total_separator_size = 0;
 		for (auto size : total_sizes) {
 			total_separator_size += size;
 		}
+	}
+
+	unsigned long get_total_separator_size_weighted() {
+		return total_separator_size_weighted;
 	}
 
 	unsigned long get_total_separator_size() {
