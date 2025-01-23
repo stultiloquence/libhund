@@ -22,10 +22,12 @@ TEST_CASE("Obvious block structure is identified") {
     auto computation = HUNDComputation(
         (BisectionConfigMtKahypar) {
             .max_imbalance = 0.03,
-            .objective_function = HUND_KM1,
         },
         (BreakConditionConfigBlockSize) {
             .max_block_size_inclusive = 2,
+        },
+        (MultithreadingConfig) {
+            .number_of_threads_per_rank = 0
         },
         hypergraph,
         logger
@@ -52,7 +54,6 @@ TEST_CASE("Time to run on real life matrix") {
     auto hypergraph = Hypergraph(MATRIX_MARKET, "../examples/fd18.mtx");
     auto kahypar_config = BisectionConfigMtKahypar {
         .max_imbalance = 0.03,
-        .objective_function = HUND_KM1,
     };
 
     auto logger = NoOpLogger();
@@ -60,6 +61,9 @@ TEST_CASE("Time to run on real life matrix") {
         kahypar_config,
         (BreakConditionConfigRecursionDepth) {
             .depth = recursion_depth,
+        },
+        (MultithreadingConfig) {
+            .number_of_threads_per_rank = 0
         },
         hypergraph,
         logger
@@ -69,7 +73,14 @@ TEST_CASE("Time to run on real life matrix") {
         return computation.run_multi_node();
     };
 
-    KahyparComputation kahypar_computation(kahypar_config, nr_of_blocks, hypergraph);
+    KahyparComputation kahypar_computation(
+        kahypar_config,
+        nr_of_blocks,
+        (MultithreadingConfig) {
+            .number_of_threads_per_rank = 0
+        },
+        hypergraph
+    );
 
     BENCHMARK("fd18 KahyparComputation.run()") {
         return kahypar_computation.run();
