@@ -127,18 +127,21 @@ void run_run(
 	std::string row_perm_file,
 	std::string col_perm_file
 ) {
-	auto logger = NoOpLogger();
+	int node_id;
+	MPI_Comm_rank(MPI_COMM_WORLD, &node_id);
+
+	if (node_id == 0) {
+		printf("Run HUND Computation\n");
+		printf("Matrix dimensions: %lu x %lu\n", hypergraph.get_vertex_count(), hypergraph.get_edge_count());
+	}
 	auto hund_computation = HUNDComputation(
 		bisection_config,
 		break_condition_config,
 		multithreading_config,
-		hypergraph,
-		logger
+		hypergraph
 	);
 	auto result = hund_computation.run_multi_node();
 
-	int node_id;
-	MPI_Comm_rank(MPI_COMM_WORLD, &node_id);
 	if (node_id != 0) return;
 
 	switch (output_type) {
@@ -197,29 +200,29 @@ int main(int argc, char** argv) {
     	->group("Bisection options");
 
     double kahypar_max_imbalance = 0.03;
-    app.add_option("--kahypar-max-imbalance", kahypar_max_imbalance, "Maximum imbalance passed as a parameter to the MT_KAHYPAR bisection method. Only has an effect if --bisection-method is set to MT_KAHYPAR.")
+	app.add_option("--kahypar-max-imbalance", kahypar_max_imbalance, "Maximum imbalance passed as a parameter to the MT_KAHYPAR bisection method. Only has an effect if --bisection-method is set to MT_KAHYPAR. Default value is 0.03.")
     	->group("Bisection options")
     	->check(CLI::PositiveNumber);
 
    	std::map<std::string, KahyparObjectiveFunction> kahypar_objective_function_map{{"KM1", KahyparObjectiveFunction::KM1}, {"SOED", KahyparObjectiveFunction::SOED}, {"CUT", KahyparObjectiveFunction::CUT}};
-    KahyparObjectiveFunction kahypar_objective_function;
-    app.add_option("--kahypar-objective-function", kahypar_objective_function, "Objective function passed as a parameter to the MT_KAHYPAR bisection method. Must be one of KM1, CUT, SOED. Only has an effect if --bisection-method is set to MT_KAHYPAR.")
+    KahyparObjectiveFunction kahypar_objective_function = KahyparObjectiveFunction::KM1;
+    app.add_option("--kahypar-objective-function", kahypar_objective_function, "Objective function passed as a parameter to the MT_KAHYPAR bisection method. Must be one of KM1, CUT, SOED. Only has an effect if --bisection-method is set to MT_KAHYPAR. Default value is KM1.")
         ->transform(CLI::CheckedTransformer(kahypar_objective_function_map, CLI::ignore_case))
     	->group("Bisection options");
 
    	std::map<std::string, BreakConditionVariant> break_condition_variant_map{{"RECURSION_DEPTH", RECURSION_DEPTH}, {"BLOCK_SIZE", BLOCK_SIZE}};
     BreakConditionVariant break_condition_variant = BLOCK_SIZE;
-    app.add_option("--break-condition", break_condition_variant, "Specify at what point in the recursion to switch to a local ordering algorithm. Set to BLOCK_SIZE to stop at a certain block size (specified with --block-size), or to RECURSION_DEPTH to stop at a certain recursion depth (specified with --recursion-depth).")
+    app.add_option("--break-condition", break_condition_variant, "Specify at what point in the recursion to switch to a local ordering algorithm. Set to BLOCK_SIZE to stop at a certain block size (specified with --block-size), or to RECURSION_DEPTH to stop at a certain recursion depth (specified with --recursion-depth). Default value is BLOCK_SIZE.")
         ->transform(CLI::CheckedTransformer(break_condition_variant_map, CLI::ignore_case))
     	->group("Break Condition Options");
 
-    int block_size;
-    app.add_option("--block-size", block_size, "Specify the block size at which to switch to a local ordering algorithm. A local ordering algorithm is used whenever a block's row or column count is less than or equal to --block-size. Only has an effect if --break-condition is set to BLOCK_SIZE.")
+    int block_size = 10;
+    app.add_option("--block-size", block_size, "Specify the block size at which to switch to a local ordering algorithm. A local ordering algorithm is used whenever a block's row or column count is less than or equal to --block-size. Only has an effect if --break-condition is set to BLOCK_SIZE. Default value is 10.")
     	->group("Break Condition Options")
     	->check(CLI::NonNegativeNumber);
 
-    int recursion_depth;
-    app.add_option("--recursion-depth", recursion_depth, "Specify the recursion depth at which to switch to a local ordering algorithm. Only has an effect if --break-condition is set to RECURSION_DEPTH.")
+    int recursion_depth = 1;
+    app.add_option("--recursion-depth", recursion_depth, "Specify the recursion depth at which to switch to a local ordering algorithm. Only has an effect if --break-condition is set to RECURSION_DEPTH.  Default value is 1.")
     	->group("Break Condition Options")
     	->check(CLI::NonNegativeNumber);
 
@@ -228,14 +231,15 @@ int main(int argc, char** argv) {
     CLI::App *run = app.add_subcommand("run", "Do a normal run of the HUND algorithm.");
 	
    	std::map<std::string, OutputType> output_type_map{{"PRINT", PRINT}, {"FILES", FILES}};
-	OutputType output_type;
-    run->add_option("-o,--output-type", output_type, "Set to PRINT (default) to print the results to stdout in a human-readable way. Set to FILES to store the row and column permutation vectors in a file each, specified through --col-perm-file and --row-perm-file.")
+	OutputType output_type = PRINT;
+    run->add_option("-o,--output-type", output_type, "Set to PRINT to print the results to stdout in a human-readable way. Set to FILES to store the row and column permutation vectors in a file each, specified through --col-perm-file and --row-perm-file. . Default value is PRINT.")
         ->transform(CLI::CheckedTransformer(output_type_map, CLI::ignore_case))
     	->group("Output options");
-    std::string col_perm_file, row_perm_file;
-    run->add_option("--col-perm-file", col_perm_file, "Specify output file for the column permutation. Only has an effect if --output-type is set to FILES.")
+    std::string col_perm_file = "col_perms.txt";
+	std::string row_perm_file = "row_perms.txt";
+    run->add_option("--col-perm-file", col_perm_file, "Specify output file for the column permutation. Only has an effect if --output-type is set to FILES. Default value is col_perms.txt.")
     	->group("Output options");
-    run->add_option("--row-perm-file", row_perm_file, "Specify output file for the row permutation. Only has an effect if --output-type is set to FILES.")
+    run->add_option("--row-perm-file", row_perm_file, "Specify output file for the row permutation. Only has an effect if --output-type is set to FILES. Default value is row_perms.txt.")
     	->group("Output options");
 
     CLI::App *bisection_test = app.add_subcommand("bisection-test", "Run the HUND algorithm as specified, and report how all the attempts at simultaneous bisection went.");

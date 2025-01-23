@@ -29,6 +29,7 @@ private:
 	// Configuration Objects
 	BisectionConfig bisection_config;
 	BreakConditionConfig break_condition_config;
+	inline static NoOpLogger default_logger = NoOpLogger();
 	Logger &logger;
 
 	mt_kahypar_context_t* mt_kahypar_context;
@@ -317,6 +318,13 @@ private:
 
 
 public:
+	HUNDComputation(
+		BisectionConfig bc,
+		BreakConditionConfig bcc,
+		MultithreadingConfig mc,
+		Hypergraph &hypergraph
+	) : HUNDComputation(bc, bcc, mc, hypergraph, default_logger) { }
+
 	HUNDComputation(
 		BisectionConfig bc,
 		BreakConditionConfig bcc,
