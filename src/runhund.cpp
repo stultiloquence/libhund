@@ -77,7 +77,8 @@ void run_bisection_test(
 	Hypergraph hypergraph,
 	BisectionConfig bisection_config,
 	BreakConditionConfig break_condition_config,
-	MultithreadingConfig multithreading_config
+	MultithreadingConfig multithreading_config,
+	std::string output_file_name
 ) {
 	// Print initial info.
 	int node_id;
@@ -101,20 +102,10 @@ void run_bisection_test(
 
 	// Print recorded results.
 	if (node_id == 0) {
-		for (auto i = 0; i < bisection_attempts.size(); i++) {
-			auto attempt = bisection_attempts[i];
-			printf("Parallel Bisection #%i:\n", i);
-			printf("    Recursion Depth: %i\n", attempt.recursion_depth);
-			printf("    Range:           [%i, %i]\n", attempt.range_start, attempt.range_end - 1);
-			printf("    Max Imbalances:  ");
-			print_vector_to_stream(attempt.max_imbalances, std::cout);
-			printf("    True Imbalances: ");
-			print_vector_to_stream(attempt.true_imbalances, std::cout);
-			printf("    Qualities:       ");
-			print_vector_to_stream(attempt.qualities, std::cout);
-			printf("    Rel. Sep. Sizes: ");
-			print_vector_to_stream(attempt.relative_separator_sizes, std::cout);
-		}
+		std::ofstream output_file;
+		output_file.open(output_file_name);
+		print_as_json(bisection_attempts, output_file);
+		output_file.close();
 	}
 }
 
@@ -238,6 +229,9 @@ int main(int argc, char** argv) {
 
     CLI::App *bisection_test = app.add_subcommand("bisection-test", "Run the HUND algorithm as specified, and report how all the attempts at simultaneous bisection went.");
 
+    std::string output_file = "bisection-test_results.json";
+    bisection_test->add_option("--output-file", output_file, "Output file for the bisetion test result (in JSON format). Default value is bisection-test_results.json");
+
     CLI::App *separator_size_test = app.add_subcommand("separator-size-test", "Run the HUND algorithm as specified, and report the total size of separators and compare them to a run of MtKaHyPar.");
 
     app.footer("EXAMPLES\n"
@@ -297,7 +291,7 @@ int main(int argc, char** argv) {
     if (app.got_subcommand(separator_size_test)) {
     	run_separator_size_test(hypergraph, bisection_config, break_condition_config, multithreading_config);
     } else if (app.got_subcommand(bisection_test)) {
-    	run_bisection_test(hypergraph, bisection_config, break_condition_config, multithreading_config);
+    	run_bisection_test(hypergraph, bisection_config, break_condition_config, multithreading_config, output_file);
     } else if (app.got_subcommand(run)) {
     	run_run(hypergraph, bisection_config, break_condition_config, multithreading_config, output_type, row_perm_file, col_perm_file);
     }

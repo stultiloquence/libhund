@@ -139,6 +139,51 @@ struct BisectionAttempts {
 	std::vector<double> relative_separator_sizes;
 };
 
+void print_as_json(std::vector<double> v, std::ostream &os) {
+	if (v.size() == 0) {
+		os << "[]";
+		return;
+	}
+	os << "[";
+	for (size_t i = 0; i < v.size() - 1; i++) {
+		os << v[i] << ", ";
+	}
+	os << v[v.size() - 1] << "]";
+}
+
+void print_as_json(BisectionAttempts bisection_attempts, std::ostream &os) {
+	os << "{\n";
+	os << "    \"recursion_depth\": " << bisection_attempts.recursion_depth << ",\n";
+	os << "    \"range_start\": " << bisection_attempts.range_start << ",\n";
+	os << "    \"range_end\": " << bisection_attempts.range_end << ",\n";
+	os << "    \"max_imbalances\": ";
+	print_as_json(bisection_attempts.max_imbalances, os);
+	os << ",\n";
+	os << "    \"qualities\": ";
+	print_as_json(bisection_attempts.qualities, os);
+	os << ",\n";
+	os << "    \"true_imbalances\": ";
+	print_as_json(bisection_attempts.true_imbalances, os);
+	os << ",\n";
+	os << "    \"relative_separator_sizes\": ";
+	print_as_json(bisection_attempts.relative_separator_sizes, os);
+	os << "\n}";
+}
+
+void print_as_json(std::vector<BisectionAttempts> &bas, std::ostream &os) {
+	if (bas.size() == 0) {
+		os << "[]";
+		return;
+	}
+	os << "[\n";
+	for (size_t i = 0; i < bas.size() - 1; i++) {
+		print_as_json(bas[i], os);
+		os << ", ";
+	}
+	print_as_json(bas[bas.size() - 1], os);
+	os << "\n]";
+}
+
 class BisectionQualityRangeLogger : public Logger {
 private:
 	constexpr static const BisectionAttempt null_value = {
