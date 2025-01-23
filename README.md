@@ -25,11 +25,8 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:mt-kahypar/build/lib $MPIEXEC $FLAGS_MPI_BATCH 
 (what we did once:)
 ```
 1. download catch_amalgamated.cpp and .hpp into catch2/
-2. patch catch_amalgamated.cpp according to https://stackoverflow.com/a/58290117
-3. mpicxx -std=c++17 -DCATCH_AMALGAMATED_CUSTOM_MAIN -c catch2/catch_amalgamated.cpp
-4. ar rvs catch_amalgamated.a catch_amalgamated.o
-5. 
-
+2. mpicxx -std=c++17 -DCATCH_AMALGAMATED_CUSTOM_MAIN -c catch2/catch_amalgamated.cpp
+3. ar rvs catch_amalgamated.a catch_amalgamated.o
 ```
 
 every time:

@@ -13,7 +13,7 @@ void require_permutation(std::vector<unsigned long> vector) {
     }
 }
 
-TEST_CASE("Obvious block structure is identified") {
+TEST_CASE("Obvious block structure is identified", "[correctness]") {
     std::vector<size_t> example_hyperedge_indices { 0, 2, 4, 6, 8, 10, 12, 14, 16 };
     std::vector<unsigned long> example_hyperedges { 0, 1, 0, 1, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7, 6, 7 };
 
@@ -47,7 +47,7 @@ TEST_CASE("Obvious block structure is identified") {
     }
 }
 
-TEST_CASE("Time to run on real life matrix") {
+TEST_CASE("Time to run on real life matrix", "[performance]") {
     const int recursion_depth = 3;
     const int nr_of_blocks = pow(2, recursion_depth);
 
