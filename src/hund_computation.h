@@ -61,20 +61,7 @@ private:
 			mt_kahypar_get_partition(partitioned_hg, partition.get());
 
 			auto result = std::vector(partition.get(), partition.get() + hypergraph.get_vertex_count());
-			double quality;
-			switch (cmk->objective_function) {
-			case KahyparObjectiveFunction::KM1:
-				quality = mt_kahypar_km1(partitioned_hg);
-				break;
-			case KahyparObjectiveFunction::CUT:
-				quality = mt_kahypar_cut(partitioned_hg);
-				break;
-			case KahyparObjectiveFunction::SOED:
-				quality = mt_kahypar_soed(partitioned_hg);
-				break;
-			default:
-				assert(false);
-			}
+			double quality = mt_kahypar_km1(partitioned_hg);
 
 			auto true_imbalance = mt_kahypar_imbalance(partitioned_hg, mt_kahypar_context);
 			mt_kahypar_free_hypergraph(mt_hypergraph);
@@ -344,7 +331,7 @@ public:
 				mt_kahypar_context,
 				2 /* number of blocks */,
 				cmk->max_imbalance,
-				to_mt_kahypar_objective_function(cmk->objective_function)
+				KM1
 			);
 			mt_kahypar_set_context_parameter(mt_kahypar_context, VERBOSE, "0");
 		}

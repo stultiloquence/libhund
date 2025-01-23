@@ -25,7 +25,7 @@ public:
 			mt_kahypar_context,
 			nr_of_blocks,
 			config.max_imbalance,
-			to_mt_kahypar_objective_function(config.objective_function)
+			KM1
 		);
 		mt_kahypar_set_context_parameter(mt_kahypar_context, VERBOSE, "0");
 	}

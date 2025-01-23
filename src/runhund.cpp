@@ -204,12 +204,6 @@ int main(int argc, char** argv) {
     	->group("Bisection options")
     	->check(CLI::PositiveNumber);
 
-   	std::map<std::string, KahyparObjectiveFunction> kahypar_objective_function_map{{"KM1", KahyparObjectiveFunction::KM1}, {"SOED", KahyparObjectiveFunction::SOED}, {"CUT", KahyparObjectiveFunction::CUT}};
-    KahyparObjectiveFunction kahypar_objective_function = KahyparObjectiveFunction::KM1;
-    app.add_option("--kahypar-objective-function", kahypar_objective_function, "Objective function passed as a parameter to the MT_KAHYPAR bisection method. Must be one of KM1, CUT, SOED. Only has an effect if --bisection-method is set to MT_KAHYPAR. Default value is KM1.")
-        ->transform(CLI::CheckedTransformer(kahypar_objective_function_map, CLI::ignore_case))
-    	->group("Bisection options");
-
    	std::map<std::string, BreakConditionVariant> break_condition_variant_map{{"RECURSION_DEPTH", RECURSION_DEPTH}, {"BLOCK_SIZE", BLOCK_SIZE}};
     BreakConditionVariant break_condition_variant = BLOCK_SIZE;
     app.add_option("--break-condition", break_condition_variant, "Specify at what point in the recursion to switch to a local ordering algorithm. Set to BLOCK_SIZE to stop at a certain block size (specified with --block-size), or to RECURSION_DEPTH to stop at a certain recursion depth (specified with --recursion-depth). Default value is BLOCK_SIZE.")
@@ -276,7 +270,6 @@ int main(int argc, char** argv) {
     case MT_KAHYPAR:
     	bisection_config = BisectionConfigMtKahypar {
     		.max_imbalance = kahypar_max_imbalance,
-    		.objective_function = kahypar_objective_function
     	};
     	break;
     default:
