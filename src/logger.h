@@ -7,21 +7,57 @@
 #include <mpi.h>
 
 #include <types.h>
+#include <bisector.h>
 #include <hypergraph_bisection.h>
 #include <hypergraph.h>
 
+/**
+ * Abstract class for Loggers that can be passed to the HUNDComputation class.
+ */
 class Logger {
 public:
+	/**
+	 * This logging function is called in both HUNDComputation.run_single_node
+	 * and .run_multi_node, right after a bisection is performed. It informs
+	 * the logger over the computed bisection. It is a "potential" partition
+	 * because in the multi node case, it might not be the best partition out
+	 * of all the parallel nodes attempting the same bisection. So this logging
+	 * function can in particular be used to compare different node's partition
+	 * attempts.
+	 * @param node_id The logging node's MPI rank.
+	 * @param hypergraph The (sub)hypergraph that is currently being partitioned.
+	 * @param recursion_depth The current recursion depth.
+	 * @param range_start The first (inclusive) MPI rank of all the ranks
+	 *     that are attempting to bisect the same hypergraph.
+	 * @param range_end The first (exclusive) MPI rank of all the ranks
+	 *     that are attempting to bisect the same hypergraph.
+	 * @param partition The computed partition.
+	 */
 	virtual void log_potential_partition(
 		int node_id,
 		Hypergraph &hypergraph,
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		std::vector<int> &partition,
-		double partition_quality,
-		double true_imbalance
+		Partition &partition
 	) {}
+
+	/**
+	 * This logging function is called in both HUNDComputation.run_single_node
+	 * and .run_multi_node, after all partition attempts have been compared,
+	 * the best one has been chosen, and applied to the hypergraph, resulting in
+	 * the HypergraphBisection hb. It only differes from log_potential_partition
+	 * in the multi node case, and only when there is more than one node attempting
+	 * the partition.
+	 * @param node_id The logging node's MPI rank.
+	 * @param hypergraph The (sub)hypergraph that is currently being partitioned.
+	 * @param recursion_depth The current recursion depth.
+	 * @param range_start The first (inclusive) MPI rank of all the ranks
+	 *     that are attempting to bisect the same hypergraph.
+	 * @param range_end The first (exclusive) MPI rank of all the ranks
+	 *     that are attempting to bisect the same hypergraph.
+	 * @param hb The computed hypergraph bisection.
+	 */
 	virtual void log_best_bisection(
 		int node_id,
 		Hypergraph &hypergraph,
@@ -32,18 +68,26 @@ public:
 	) {}
 };
 
+/**
+ * This logger does nothing. To be passed to HUNDComputation when no logging
+ * is desired. Incurs no performance penalty.
+ */
 class NoOpLogger : public Logger {
 public:
+	/**
+	 * Does nothing.
+	 */
 	void log_potential_partition(
 		int node_id,
 		Hypergraph &hypergraph,
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		std::vector<int> &partition,
-		double partition_quality,
-		double true_imbalance
+		Partition &partition
 	) override {}
+	/**
+	 * Does nothing.
+	 */
 	void log_best_bisection(
 		int node_id,
 		Hypergraph &hypergraph,
@@ -54,27 +98,41 @@ public:
 	) override {}
 };
 
+/**
+ * SeparatorSizeLogger. Records the total separator size that the HUND
+ * algorithm yields. Also computes a total separator size weighted by
+ * the number of blocks each separator spans. Can only be used when the
+ * HUNDComputation is configured with a BreakConditionConfigRecursionDepth.
+ */
 class SeparatorSizeLogger : public Logger {
 private:
 	int total_recursion_depth;
 	unsigned long total_separator_size_weighted = 0;
 	unsigned long total_separator_size = 0;
 public:
+	/**
+	 * To compute the weighted partition, the Logger needs to know
+	 * the maximum recursion depth.
+	 */
 	SeparatorSizeLogger(
 		int total_recursion_depth
 	) : total_recursion_depth(total_recursion_depth) {};
 
+	/**
+	 * Does nothing.
+	 */
 	void log_potential_partition(
 		int node_id,
 		Hypergraph &hypergraph,
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		std::vector<int> &partition,
-		double partition_quality,
-		double true_imbalance
+		Partition &partition
 	) override {}
 
+	/**
+	 * Adds the next bisection's separator size to the ongoing count.
+	 */
 	void log_best_bisection(
 		int node_id,
 		Hypergraph &hypergraph,
@@ -89,6 +147,11 @@ public:
 		}
 	}
 
+	/**
+	 * Makes all MPI nodes collect each other's data, so that they all contain
+	 * the correct final results. To be called after the HUNDComputation has
+	 * finished.
+	 */
 	void gather() {
 		MPI_Comm MPI_COMM_SEPARATOR_SIZE;
 		MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_SEPARATOR_SIZE);
@@ -116,15 +179,31 @@ public:
 		}
 	}
 
+	/**
+	 * Return the total weighted separator size. This is the sum of the number of
+	 * columns spanned by each separator, multiplied by the number of blocks the
+	 * separator spans. Currently uses the maximum number of blocks potentially
+	 * spanned by each separator, and is therefore rather broken.
+	 * @return The total weighted separator size.
+	 */
 	unsigned long get_total_separator_size_weighted() {
 		return total_separator_size_weighted;
 	}
 
+	/**
+	 * Return the total separator size. This is the sum of the number of
+	 * columns spanned by each separator.
+	 * @return The total separtor size.
+	 */
 	unsigned long get_total_separator_size() {
 		return total_separator_size;
 	}
 };
 
+/**
+ * Records information about a single BisectionAttempt that occured during
+ * the HUNDComputation algorithm.
+ */
 struct BisectionAttempt {
 	int node_id;
 	int range_start;
@@ -146,6 +225,13 @@ struct BisectionAttempt {
 	}
 };
 
+/**
+ * Records aggregated information about all bisection attempts that were
+ * done during the HUNDComputation for one given subhypergraph, that is, at
+ * a given recursion depth by the nodes with node id [range_start, range_end[,
+ * all attempting the same bisection. This can be used to compare the different
+ * bisection attempts.
+ */
 struct BisectionAttempts {
 	int recursion_depth;
 	int range_start;
@@ -157,6 +243,11 @@ struct BisectionAttempts {
 	std::vector<size_t> separator_sizes;
 };
 
+/**
+ * Writes a std::vector<double> to an std::ostream in JSON format.
+ * @param v the vector to be written to the stream.
+ * @param os the stream to be written into.
+ */
 void print_as_json(std::vector<double> v, std::ostream &os) {
 	if (v.size() == 0) {
 		os << "[]";
@@ -169,6 +260,11 @@ void print_as_json(std::vector<double> v, std::ostream &os) {
 	os << v[v.size() - 1] << "]";
 }
 
+/**
+ * Write a std::vector<size_t> to an std::ostream in JSON format.
+ * @param v the vector to be written to the stream.
+ * @param os the stream to be written into.
+ */
 void print_as_json(std::vector<size_t> v, std::ostream &os) {
 	if (v.size() == 0) {
 		os << "[]";
@@ -181,6 +277,11 @@ void print_as_json(std::vector<size_t> v, std::ostream &os) {
 	os << v[v.size() - 1] << "]";
 }
 
+/**
+ * Write a BisectionAttempts to an std::ostream in JSON format.
+ * @param bisection_attempts The BisectionAttempts object to be serialized.
+ * @param os the stream to be written into.
+ */
 void print_as_json(BisectionAttempts bisection_attempts, std::ostream &os) {
 	os << "{\n";
 	os << "    \"recursion_depth\": " << bisection_attempts.recursion_depth << ",\n";
@@ -199,6 +300,11 @@ void print_as_json(BisectionAttempts bisection_attempts, std::ostream &os) {
 	os << "\n}";
 }
 
+/**
+ * Write a std::vector<BisectionAttempts> to an std::ostream in JSON format.
+ * @param bas The vector of BisectionAttempts to be serialized.
+ * @param os the stream to be written into.
+ */
 void print_as_json(std::vector<BisectionAttempts> &bas, std::ostream &os) {
 	if (bas.size() == 0) {
 		os << "[]";
@@ -213,6 +319,11 @@ void print_as_json(std::vector<BisectionAttempts> &bas, std::ostream &os) {
 	os << "\n]";
 }
 
+/**
+ * Logger that collects all the attempts at parallel bisection that occured
+ * during the HUNDComputation as a list. Can be used to see the effect that
+ * the parallel bisection attempts have.
+ */
 class BisectionQualityRangeLogger : public Logger {
 private:
 	constexpr static const BisectionAttempt null_value = {
@@ -222,6 +333,9 @@ private:
 	std::vector<BisectionAttempt> bisection_attempts_by_recursion_depth;
 	MPI_Datatype MPI_BISECTION_ATTEMPT_TYPE;
 public:
+	/**
+	 * Constructor. Prepares MPI stuff for logging.
+	 */
 	BisectionQualityRangeLogger() {
 		// Create a type for struct BisectionAttempt.
 		const int nitems = 8;
@@ -251,15 +365,17 @@ public:
 		MPI_Type_commit(&MPI_BISECTION_ATTEMPT_TYPE);
 	}
 
+	/**
+	 * Stores a potential partition as a BisectionAttempt if there are at least
+	 * two nodes attempting this bisection in parallel.
+	 */
 	void log_potential_partition(
 		int node_id,
 		Hypergraph &hypergraph,
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		std::vector<int> &partition,
-		double partition_quality,
-		double true_imbalance
+		Partition &partition
 	) override {
 		if (range_start == range_end) {
 			// There is only one bisection attempt.
@@ -272,7 +388,7 @@ public:
 			// There is one logger instance per node, so each instance should be called by one node_id only.
 			assert(false);
 		}
-		auto hb = HypergraphBisection(partition, hypergraph);
+		auto hb = HypergraphBisection(partition.partition, hypergraph);
 		bisection_attempts_by_recursion_depth.resize(std::max(
 			(unsigned long) recursion_depth + 1,
 			bisection_attempts_by_recursion_depth.size()
@@ -283,12 +399,15 @@ public:
 			.range_end = range_end,
 			.vertex_count = hypergraph.get_vertex_count(),
 			.edge_count = hypergraph.get_edge_count(),
-			.quality = partition_quality,
-			.true_imbalance = true_imbalance,
+			.quality = partition.quality,
+			.true_imbalance = partition.true_imbalance,
 			.separator_size = hb.get_separator_size(),
 		};
 	}
 
+	/**
+	 * Does nothing.
+	 */
 	void log_best_bisection(
 		int node_id,
 		Hypergraph &hypergraph,
@@ -298,6 +417,13 @@ public:
 		HypergraphBisection &hb
 	) override { }
 
+	/**
+	 * Gathers the information of all BisectionQualityRangeLoggers working on
+	 * the different MPI nodes into one vector of BisectionAttempts, one for
+	 * each bisection attempt that occured with at least two nodes attempting
+	 * a bisection.
+	 * @return A std::vector of BisectionAttempts.
+	 */
 	std::vector<BisectionAttempts> gather() {
 		MPI_Comm MPI_COMM;
 		MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM);

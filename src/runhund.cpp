@@ -24,15 +24,6 @@ enum BreakConditionVariant {
   BLOCK_SIZE,
 };
 
-
-template <typename T>
-void print_vector_to_stream(std::vector<T> v, std::ostream &os) {
-	for (size_t i = 0; i < v.size() - 1; i++) {
-		os << v[i] << " ";
-	}
-	os << v[v.size() - 1] << std::endl;
-}
-
 void run_separator_size_test(
 	Hypergraph hypergraph,
 	Bisector &bisector,
