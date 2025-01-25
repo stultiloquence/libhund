@@ -71,8 +71,8 @@ TEST_CASE("Time to run on real life matrix", "[performance]") {
         hypergraph
     );
 
-    BENCHMARK("fd18 KahyparComputation.run()") {
-        return kahypar_computation.run();
+    BENCHMARK("fd18 KahyparComputation.dissect()") {
+        return kahypar_computation.dissect();
     };
 }
 

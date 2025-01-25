@@ -271,14 +271,14 @@ int main(int argc, char** argv) {
 	
    	std::map<std::string, OutputType> output_type_map{{"PRINT", PRINT}, {"FILES", FILES}};
 	OutputType output_type = PRINT;
-    run->add_option("-o,--output-type", output_type, "Set to PRINT to print the results to stdout in a human-readable way. Set to FILES to store the row and column permutation vectors in a file each, specified through --col-perm-file and --row-perm-file. . Default value is PRINT.")
+    run->add_option("-o,--output-type", output_type, "Set to PRINT to print the results to stdout in a human-readable way. Set to FILES to store the row and column permutation vectors in a file each, specified through --col-file and --row-file. . Default value is PRINT.")
         ->transform(CLI::CheckedTransformer(output_type_map, CLI::ignore_case))
     	->group("Output options");
     std::string col_perm_file = "col_perms.txt";
 	std::string row_perm_file = "row_perms.txt";
-    run->add_option("--col-perm-file", col_perm_file, "Specify output file for the column permutation. Only has an effect if --output-type is set to FILES. Default value is col_perms.txt.")
+    run->add_option("--col-file", col_perm_file, "Specify output file for the column permutation. Only has an effect if --output-type is set to FILES. Default value is col_perms.txt.")
     	->group("Output options");
-    run->add_option("--row-perm-file", row_perm_file, "Specify output file for the row permutation. Only has an effect if --output-type is set to FILES. Default value is row_perms.txt.")
+    run->add_option("--row-file", row_perm_file, "Specify output file for the row permutation. Only has an effect if --output-type is set to FILES. Default value is row_perms.txt.")
     	->group("Output options");
 
     CLI::App *bisection_test = app.add_subcommand("bisection-test", "Run the HUND algorithm as specified, and report how all the attempts at simultaneous bisection went.");
@@ -289,12 +289,12 @@ int main(int argc, char** argv) {
     CLI::App *separator_size_test = app.add_subcommand("separator-size-test", "Run the HUND algorithm as specified, and report the total size of separators and compare them to a run of MtKaHyPar.");
 
     app.footer("EXAMPLES\n"
-    	"runhund \\\n"
-    	"    --matrix-file=matrix.mtx --matrix-file-format=MATRIX_MARKET \\\n"
-    	"    --bisection-method=MT_KAHYPAR --kahypar-max-imbalance=0.03 --kahypar-objective-function=KM1 \\\n"
-    	"    --break-condition=BLOCK_SIZE --block-size=50 \\\n"
-    	"    run --output-type=FILES --row-perm-file=rows.txt --col-perm-file=cols.txt"
-    );
+		"hundcli \\\n"
+		"    --matrix-file=examples/paper_example.mtx --matrix-file-format=MATRIX_MARKET\\n"
+		"    --bisection-method=MT_KAHYPAR --kahypar-max-imbalance=0.05 \\\n"
+		"    --break-condition=BLOCK_SIZE --block-size=2 \\\n"
+		"    run --output-type=FILES --row-file=results/rows.txt --col-file=result/cols.txt"
+	);
 
     // 2. Run CLI11.
     // Unwrap CLI11_PARSE to call MPI_Finalize(); before exiting.

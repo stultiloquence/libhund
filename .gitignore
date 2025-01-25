@@ -1,3 +1,8 @@
-build/runhund
+build/hundcli
 test/test
-external/
+examples/*
+!examples/paper_example.mtx
+!examples/raefsky6.mtx
+!examples/lns_3937.mtx
+!examples/fd18.mtx
+external/mt-kahypar
