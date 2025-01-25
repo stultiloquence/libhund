@@ -84,7 +84,7 @@ private:
 
 		auto partition = bisector.bisect(hypergraph);
 
-		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, partition.partition, partition.quality, partition.true_imbalance);
+		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, partition);
 
 		auto hb = HypergraphBisection(partition.partition, hypergraph);
 
@@ -154,7 +154,7 @@ private:
 		// 2. compute partition and quality
 		auto partition = bisector.bisect(hypergraph);
 
-		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, partition.partition, partition.quality, partition.true_imbalance);
+		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, partition);
 
 		// 3. communicate qualities to all other nodes working on this bisection.
 		int range_size = range_end - range_start;
