@@ -8,33 +8,53 @@
 #include <hund_computation.h>
 #include <kahypar_computation.h>
 
+/**
+ * Represents the CLI argument --output-type.
+ */
 enum OutputType {
 	PRINT,
 	FILES,
 };
 
+/**
+ * Represents the CLI argument --bisection-method.
+ */
 enum BisectionConfigVariant { 
-	MT_KAHYPAR 
+	MT_KAHYPAR
 };
 
-
+/**
+ * Represents the CLI argument --break-condition.
+ */
 enum BreakConditionVariant {
   RECURSION_DEPTH,
   BLOCK_SIZE,
 };
 
+/**
+ * Run HUNDComputation and a corresponding KahyparComputation, compare the
+ * size of the separators in each result and print them to stdout. The
+ * HUNDComputation must break after a certain recursion depth d, and the
+ * KahyparComputation will dissect the hypergraph into 2^d blocks.
+ * 
+ * @param hypergraph The hypergraph to run the computations on.
+ * @param bisector The bisection algorithm to use in the HUNDComputation.
+ * @param break_condition_config The break condition for the HUNDComputation. Must
+ *     be an instance of BreakConditionConfigRecursionDepth.
+ * @param kahypar_max_imbalance Maximum imbalance passed to the KahyparComputation.
+ * @param threads_per_rank Number of threads the KahyparComputation should use.
+ */
 void run_separator_size_test(
 	Hypergraph hypergraph,
 	Bisector &bisector,
 	BreakConditionConfig break_condition_config,
-	BisectionConfigVariant bisection_config_variant,
 	double kahypar_max_imbalance,
 	int threads_per_rank
 ) {
 	// Get the configuration right.
 	BreakConditionConfigRecursionDepth *crd = std::get_if<BreakConditionConfigRecursionDepth>(&break_condition_config);
-	if (bisection_config_variant != MT_KAHYPAR || !crd) {
-		printf("Error: separator-size-test needs --bisection-method to be MT_KAHYPAR and --break-condition to be RECURSION_DEPTH.\n");
+	if (!crd) {
+		printf("Error: separator-size-test needs --break-condition=RECURSION_DEPTH.\n");
 		return;
 	}
 	int nr_of_blocks = std::pow(2, crd->depth);
@@ -82,7 +102,16 @@ void run_separator_size_test(
 	}
 }
 
-
+/**
+ * Run HUNDComputation with a BisectionQualityRangeLogger, recording all
+ * parallel bisection attempts that take place and writing the result in JSON
+ * format to the specified output file.
+ *
+ * @param hypergraph The hypergraph to run the HUNDComputation on.
+ * @param bisector The bisection algorithm to use in the HUNDComputation.
+ * @param break_condition_config The break condition for the HUNDComputation.
+ * @param output_file_name Name of the JSON file to write the results to.
+ */
 void run_bisection_test(
 	Hypergraph hypergraph,
 	Bisector &bisector,
@@ -117,6 +146,20 @@ void run_bisection_test(
 	}
 }
 
+/**
+ * Run a HUNDComputation and either print the results to stdout or store them
+ * in row and column permutation files.
+ *
+ * @param hypergraph The hypergraph to run the HUNDComputation on.
+ * @param bisector The bisection algorithm to use in the HUNDComputation.
+ * @param break_condition_config The break condition for the HUNDComputation.
+ * @param output_type Whether to write the resulting permutation vectors to
+ *     stdout or to two files.
+ * @param row_perm_file Name of the text file to write the row permutation to.
+ *     Only has an effect if output_type == FILES.
+ * @param row_perm_file Name of the text file to write the column permutation to.
+ *     Only has an effect if output_type == FILES.
+ */
 void run_run(
 	Hypergraph hypergraph,
 	Bisector &bisector,
@@ -166,6 +209,11 @@ void run_run(
 	}
 }
 
+/**
+ * Main function. Configure the CLI options, help text,
+ * parse the command line arguments (all using the CLI11 library),
+ * load the given hypergraph file and call the appropriate run_ function.
+ */
 int main(int argc, char** argv) {
 	MPI_Init(&argc, &argv);
 
@@ -292,7 +340,7 @@ int main(int argc, char** argv) {
     // 4. Run actual command.
 
     if (app.got_subcommand(separator_size_test)) {
-    	run_separator_size_test(hypergraph, *bisector, break_condition_config, bisection_config_variant, kahypar_max_imbalance, threads_per_rank);
+    	run_separator_size_test(hypergraph, *bisector, break_condition_config, kahypar_max_imbalance, threads_per_rank);
     } else if (app.got_subcommand(bisection_test)) {
     	run_bisection_test(hypergraph, *bisector, break_condition_config, output_file);
     } else if (app.got_subcommand(run)) {
