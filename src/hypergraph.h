@@ -15,8 +15,24 @@ typedef enum MatrixFileFormat {
 	MATRIX_MARKET
 } matrix_file_format_t;
 
+/**
+ * This class represents an instance of a hypergraph. It is represents by the
+ * Compressed Column Storage of the underlying matrix without any values.
+ */
 class Hypergraph {
 private:
+
+	/**
+	 * Sorting the entries from the Matrix Market format increasingly by columns 
+	 *  and then rows.
+	 *
+	 * @param rows Vector of the row entries.
+	 * @param cols Vector of the column entries.
+	 * @param sorted_rows Reference to the vector in which to store the sorted
+	 *     rows.
+	 * @param sorted_cols Reference to the vector in which to store the sorted
+	 *     columns. 
+	 */
 	void sort_by_col_first(
 		std::vector<unsigned long> rows,
 		std::vector<unsigned long> cols,
@@ -47,18 +63,28 @@ public:
 	std::vector<unsigned long> hyperedges;
 	std::vector<size_t> hyperedge_indices;
 
-	size_t get_vertex_count() {
-		return vertex_count;
-	}
-
-	size_t get_edge_count() {
-		return hyperedge_indices.size() - 1;
-	}
-
+	/**
+	 * Construct a default hyergraph with no vertices or hypereges.
+	 */
 	Hypergraph() {
 		Hypergraph(0, std::vector<size_t>(), std::vector<unsigned long>());
 	}
 
+	
+	/**
+	 * Construct a hyergraph manually by passing all the information directly.
+	 * This can be seen as passing a matrix in Compressed Column Storage 
+	 * format.
+	 *
+	 * @param vertex_count Number of vertices of the hypergraph / Number of 
+	 *     rows of the matrix.
+	 * @param hyperedge_indices Vector that indicates at which index a new  
+	 *     hyeredge begins in the hyperedges paramater / Vector that indicates 
+	 *     at which index a new column begins in the following parameter.
+	 * @param hyperedges Vector that contains the vertices each hyperedges 
+	 *     spans, concatinated / Vector that contains the row index of each 
+	 *     entry of the matrix, when iterating columnwise.
+	 */
 	Hypergraph(
 		size_t vertex_count,
 		std::vector<size_t> hyperedge_indices,
@@ -67,6 +93,12 @@ public:
 		hyperedges(hyperedges),
 		hyperedge_indices(hyperedge_indices) {};
 
+	/**
+	 * Constructs a hypergraph from a (sparse) matrix in a given file format.
+	 *
+	 * @param file_format Format of the matrix file, e.g. Matrix Market.
+	 * @param file_path Path to the file containg the matrix.
+	 */
 	Hypergraph(
 		matrix_file_format_t file_format,
 		std::filesystem::path file_path
@@ -98,8 +130,23 @@ public:
 				this->hyperedge_indices.push_back(i);
 			}
 		} else {
-			throw std::runtime_error("Only MATRIX_MARKET format is supported right now.");
+			// No other format is supported as of now.
+    		assert(false);
 		}
+	}
+
+	/**
+	 * @return size_t Get the number of vertices in the hyerpgraph. 
+	 */
+	size_t get_vertex_count() {
+		return vertex_count;
+	}
+
+	/**
+	 * @return size_t Get the number of hyperedges in the hyerpgraph. 
+	 */
+	size_t get_edge_count() {
+		return hyperedge_indices.size() - 1;
 	}
 
 };

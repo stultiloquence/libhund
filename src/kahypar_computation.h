@@ -1,4 +1,5 @@
-
+#pragma once
+ 
 #include <mtkahypar.h>
 #include <mtkahypartypes.h>
 #include <types.h>
@@ -30,6 +31,10 @@ public:
 		mt_kahypar_set_context_parameter(mt_kahypar_context, VERBOSE, "0");
 	}
 
+	~KahyparComputation() {
+		mt_kahypar_free_context(mt_kahypar_context);
+	};
+
 	std::vector<int> bisect() {
 		auto mt_hypergraph = mt_kahypar_create_hypergraph(
 			DETERMINISTIC,
@@ -52,15 +57,6 @@ public:
 		mt_kahypar_free_partitioned_hypergraph(partitioned_hg);
 
 		return result;
-	}
-
-	RowColPermutation run(std::vector<int>) {
-		// todo
-		return {};
-	}
-
-	RowColPermutation run() {
-		return run(bisect());
 	}
 
 	unsigned long size_of_separator(
@@ -97,8 +93,4 @@ public:
 	double get_km1() {
 		return km1;
 	}
-
-	~KahyparComputation() {
-		mt_kahypar_free_context(mt_kahypar_context);
-	};
 };

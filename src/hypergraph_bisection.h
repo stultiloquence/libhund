@@ -2,6 +2,12 @@
 
 #include <hypergraph.h>
 
+
+/** 
+ * This class represents a single bisection of a hypergraph. It computes the 
+ * new sub-hypergraphs and corresponding permutations based on a hypergraph
+ * and the partition of its vertices.
+ */
 class HypergraphBisection {
 
 private:
@@ -28,6 +34,10 @@ private:
 	std::vector<unsigned long> vertex_permutation;
 	std::vector<unsigned long> edge_permutation;
 
+	/**
+	 * Fills the two vectors that state how big each vertex partition is and 
+	 * what position each vertex has within its own partition.   
+	 */
 	void compute_vertex_vectors() {
 		vertex_position_within_partition.reserve(vertex_count);
 
@@ -38,6 +48,15 @@ private:
 		}
 	}
 
+	/**
+	 * Fills three vectors with information about the hyperedges. They state
+	 * which partition each edge belongs to or if the edge is in the separator,
+	 * how big each hyperedge partition is and what position each vertex has
+	 * within its own partition. 
+	 *
+	 * For this it has to check whether each hyperedge is comepletly contained
+	 * in one partition or belongs to the separator.
+	 */
 	void compute_edge_vectors() {
 		edge_partition = std::vector<int>(edge_count);
 		edge_position_within_partition =  std::vector<unsigned long>(edge_count);
@@ -72,6 +91,14 @@ private:
 		}
 	}
 
+	/**
+	 * Creates the the two sub-hypergraphs based on the vertex and hyperedge
+	 * vectors and determines the size of the separator with this information.
+	 *
+	 * Checks the partition of each edge and creates the new hyeredges for the
+	 * appropriate sub-hypergraph with the information where each vertex is
+	 * relative within this sub-hypergraph.   
+	 */
 	void compute_sub_hypergraphs() {
 		for (size_t edge = 0; edge < edge_count; edge++) {
 			size_t edge_start = original_hypergraph.hyperedge_indices[edge];
@@ -102,6 +129,13 @@ private:
 			- (hypergraph_1.get_edge_count());
 	}
 
+	/**
+	 * Computes the absolute position in the original hypergraph for a vertex 
+	 * based on the partition it is in and its size within this partition. 
+
+	 * @param vertex Vertex whose position gets determined.  
+	 * @return unsigned long Absolute position of the vertex.
+	 */
 	unsigned long single_vertex_absolute_position(
 		unsigned long vertex
 	) {
@@ -113,6 +147,13 @@ private:
 		}
 	}
 
+	/**
+	 * Computes the absolute position in the original hypergraph for a edge 
+	 * based on the partition it is in and its size within this partition. 
+
+	 * @param edge Hyperedge whose position gets determined.  
+	 * @return unsigned long Absolute position of the hyperedge.
+	 */
 	unsigned long single_edge_absolute_position(
 		unsigned long edge
 	) {
@@ -126,6 +167,10 @@ private:
 		}
 	}
 
+	/**
+	 * Compute the permutation vectors that turn the matrix, which hyergraph is
+	 * based upon, into the block structure computed from the bisection.
+	 */
 	void compute_permutations() {
 		vertex_permutation.reserve(vertex_count);
 		for (unsigned long vertex = 0; vertex < vertex_count; vertex++) {
@@ -138,6 +183,16 @@ private:
 	}
 
 public:
+	/**
+	 * Constructs an bisection of a hypergraph based on a permutation of the
+	 * vertices. Computes all values that can possibly be queried in the 
+	 * getters.  
+	 *
+	 * @param vert_partition Describes the partition of the vertices. The size
+	 *     has to be the same as the amound of vertices of the hypergraph and
+	 *     the values should only be 0 or 1. 
+	 * @param hypergraph The hypergraph to be bisected.
+	 */
 	HypergraphBisection(
 		std::vector<int> vert_partition,
 		Hypergraph hypergraph
@@ -152,22 +207,42 @@ public:
 		compute_permutations();
 	};
 
+	/**
+	 * @return Get the first sub-hypergraph created from the bisection. 
+	 */
 	Hypergraph get_hypergraph_0() {
 		return hypergraph_0;
 	};
 
+	
+	/**
+	 * @return Get the second sub-hypergraph created from the bisection. 
+	 */
 	Hypergraph get_hypergraph_1() {
 		return hypergraph_1;
 	};
 
+	
+	/**
+	 * @return Get the permuation vector for the rows of the matrix, which the
+	 * vertices of the hypergraph are based upon, computed from the bisection.
+	 */
 	std::vector<unsigned long> get_vertex_permutation() {
 		return vertex_permutation;
 	}
 
+	/**
+	 * @return Get the permuation vector for the columns of the matrix, which 
+	 * the hyperedges of the hypergraph are based upon, computed from the
+	 * bisection.
+	 */
 	std::vector<unsigned long> get_edge_permutation() {
 		return edge_permutation;
 	}
 
+	/**
+	 * @return Get the number of edges that are part of the separator. 
+	 */
 	unsigned long get_separator_size() {
 		return separator_size;
 	}

@@ -3,8 +3,13 @@
 #include <mtkahypar.h>
 #include <thread>
 
+
 bool __mt_kahypar_initialized = false;
 
+/**
+ * Helper function to initilaize Mt-KaHyPar to make sure the library doesn't 
+ * get instatiated multiple times, e.g. during the separator size test.
+ */
 void initialize_mt_kahypar(
 	int nr_of_threads
 ) {
