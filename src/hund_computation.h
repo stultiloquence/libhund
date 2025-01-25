@@ -16,6 +16,40 @@
 #include <logger.h>
 
 /**
+ * Struct representing the result of the HUND computation. Consists of the row
+ * and the column permutation vector of the underlying matrix.
+ */
+struct RowColPermutation {
+  std::vector<unsigned long> row_permutation;
+  std::vector<unsigned long> column_permutation;
+};
+
+/**
+ * Struct representing the configuration for the recursion depth break
+ * condition.
+ */
+struct BreakConditionConfigRecursionDepth {
+  int depth;
+};
+
+
+/**
+ * Struct representing the configuration for the block size break condition.
+ */
+struct BreakConditionConfigBlockSize {
+  int max_block_size_inclusive;
+};
+
+/**
+ * Combined variant type of the two break conditions, to allow the user to use 
+ * both instances as the same parameter in the same function and distingush 
+ * them not by overloading the same function but by internally checking which
+ * type was used. 
+ */
+typedef std::variant<BreakConditionConfigRecursionDepth, BreakConditionConfigBlockSize> BreakConditionConfig;
+
+
+/**
  * This class represents one configured instance of a HUND computation. It is
  * completely configured through its constructor. After construction, the com-
  * putation can be run both on a single node or on sevaral nodes.

@@ -9,10 +9,14 @@
 
 #include <util.h>
 
+/**
+ * Types of matrix files from which a hypergraph can be constructed using the 
+ * Hypergraph constrcutor.
+ */
 typedef enum MatrixFileFormat {
+	MATRIX_MARKET
 	// MATLAB,
 	// RUTHERFORD_BOEING,
-	MATRIX_MARKET
 } matrix_file_format_t;
 
 /**
