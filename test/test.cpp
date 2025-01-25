@@ -18,19 +18,16 @@ TEST_CASE("Obvious block structure is identified", "[correctness]") {
     std::vector<unsigned long> example_hyperedges { 0, 1, 0, 1, 2, 3, 2, 3, 4, 5, 4, 5, 6, 7, 6, 7 };
 
     auto hypergraph = Hypergraph(8, example_hyperedge_indices, example_hyperedges);
-    auto logger = NoOpLogger();
+    auto bisector = MtKahyparBisector(
+        0.05,
+        0
+    );
     auto computation = HUNDComputation(
-        (BisectionConfigMtKahypar) {
-            .max_imbalance = 0.03,
-        },
+        bisector,
         (BreakConditionConfigBlockSize) {
             .max_block_size_inclusive = 2,
         },
-        (MultithreadingConfig) {
-            .number_of_threads_per_rank = 0
-        },
-        hypergraph,
-        logger
+        hypergraph
     );
 
     auto result = computation.run_multi_node();
@@ -50,23 +47,17 @@ TEST_CASE("Obvious block structure is identified", "[correctness]") {
 TEST_CASE("Time to run on real life matrix", "[performance]") {
     const int recursion_depth = 3;
     const int nr_of_blocks = pow(2, recursion_depth);
+    const double max_imbalance = 0.03;
 
     auto hypergraph = Hypergraph(MATRIX_MARKET, "../examples/fd18.mtx");
-    auto kahypar_config = BisectionConfigMtKahypar {
-        .max_imbalance = 0.03,
-    };
 
-    auto logger = NoOpLogger();
+    auto bisector = MtKahyparBisector(max_imbalance);
     auto computation = HUNDComputation(
-        kahypar_config,
+        bisector,
         (BreakConditionConfigRecursionDepth) {
             .depth = recursion_depth,
         },
-        (MultithreadingConfig) {
-            .number_of_threads_per_rank = 0
-        },
-        hypergraph,
-        logger
+        hypergraph
     );
 
     BENCHMARK("fd18 HUNDComputation.run_multi_node()") {
@@ -74,11 +65,9 @@ TEST_CASE("Time to run on real life matrix", "[performance]") {
     };
 
     KahyparComputation kahypar_computation(
-        kahypar_config,
+        max_imbalance,
         nr_of_blocks,
-        (MultithreadingConfig) {
-            .number_of_threads_per_rank = 0
-        },
+        0,
         hypergraph
     );
 

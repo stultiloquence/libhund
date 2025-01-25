@@ -1,6 +1,6 @@
 [
 	{
-		"directory": "/home/leon/RWTH/24w-praktikum/naive",
+		"directory": "/home/leon/RWTH/24w-praktikum/libhund",
 		"file": "runhund.cpp", 
 		"arguments": [ "g++", "-std=c++17", "-DNDEBUG", "runhund.cpp", "-o", "runhund", "mt-kahypar/build/lib/libmtkahypar.so", "-Iexternal/mt-kahypar/include", "-Iexternal/", "-Isrc/" ]
 	}

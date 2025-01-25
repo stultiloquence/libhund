@@ -7,25 +7,24 @@
 
 class KahyparComputation {
 private:
-	BisectionConfigMtKahypar config;
 	mt_kahypar_context_t* mt_kahypar_context;
 	Hypergraph &hypergraph;
 	double km1;
 public:
 	KahyparComputation(
-		BisectionConfigMtKahypar config,
+		double max_imbalance,
 		int nr_of_blocks,
-		MultithreadingConfig mc,
+		int number_of_threads,
 		Hypergraph &hypergraph
-	) : hypergraph(hypergraph), config(config) {
-		initialize_mt_kahypar(mc.number_of_threads_per_rank);
+	) : hypergraph(hypergraph) {
+		initialize_mt_kahypar(number_of_threads);
 
 		mt_kahypar_context = mt_kahypar_context_new();
 		mt_kahypar_load_preset(mt_kahypar_context, DEFAULT);
 		mt_kahypar_set_partitioning_parameters(
 			mt_kahypar_context,
 			nr_of_blocks,
-			config.max_imbalance,
+			max_imbalance,
 			KM1
 		);
 		mt_kahypar_set_context_parameter(mt_kahypar_context, VERBOSE, "0");

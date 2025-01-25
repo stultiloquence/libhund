@@ -24,14 +24,15 @@ void print_vector_to_stream(std::vector<T> v, std::ostream &os) {
 
 void run_separator_size_test(
 	Hypergraph hypergraph,
-	BisectionConfig bisection_config,
+	Bisector &bisector,
 	BreakConditionConfig break_condition_config,
-	MultithreadingConfig multithreading_config
+	BisectionConfigVariant bisection_config_variant,
+	double kahypar_max_imbalance,
+	int threads_per_rank
 ) {
 	// Get the configuration right.
-	BisectionConfigMtKahypar *cmk = std::get_if<BisectionConfigMtKahypar>(&bisection_config);
 	BreakConditionConfigRecursionDepth *crd = std::get_if<BreakConditionConfigRecursionDepth>(&break_condition_config);
-	if (!cmk || !crd) {
+	if (bisection_config_variant != MT_KAHYPAR || !crd) {
 		printf("Error: separator-size-test needs --bisection-method to be MT_KAHYPAR and --break-condition to be RECURSION_DEPTH.\n");
 		return;
 	}
@@ -48,9 +49,8 @@ void run_separator_size_test(
 		crd->depth
 	);
 	auto hund_computation = HUNDComputation(
-		*cmk,
+		bisector,
 		*crd,
-		multithreading_config,
 		hypergraph,
 		logger
 	);
@@ -61,9 +61,9 @@ void run_separator_size_test(
 
 	// Run KahyparComputation.
 	KahyparComputation kahypar_computation(
-		*cmk,
+		kahypar_max_imbalance,
+		threads_per_rank,
 		nr_of_blocks,
-		multithreading_config,
 		hypergraph
 	);
 	auto kahypar_size = kahypar_computation.size_of_separator();
@@ -81,9 +81,8 @@ void run_separator_size_test(
 
 void run_bisection_test(
 	Hypergraph hypergraph,
-	BisectionConfig bisection_config,
+	Bisector &bisector,
 	BreakConditionConfig break_condition_config,
-	MultithreadingConfig multithreading_config,
 	std::string output_file_name
 ) {
 	// Print initial info.
@@ -97,9 +96,8 @@ void run_bisection_test(
 	// Run HUNDComputation.
 	auto logger = BisectionQualityRangeLogger();
 	auto hund_computation = HUNDComputation(
-		bisection_config,
+		bisector,
 		break_condition_config,
-		multithreading_config,
 		hypergraph,
 		logger
 	);
@@ -117,9 +115,8 @@ void run_bisection_test(
 
 void run_run(
 	Hypergraph hypergraph,
-	BisectionConfig bisection_config,
+	Bisector &bisector,
 	BreakConditionConfig break_condition_config,
-	MultithreadingConfig multithreading_config,
 	OutputType output_type,
 	std::string row_perm_file,
 	std::string col_perm_file
@@ -132,9 +129,8 @@ void run_run(
 		printf("Matrix dimensions: %lu x %lu\n", hypergraph.get_vertex_count(), hypergraph.get_edge_count());
 	}
 	auto hund_computation = HUNDComputation(
-		bisection_config,
+		bisector,
 		break_condition_config,
-		multithreading_config,
 		hypergraph
 	);
 	auto result = hund_computation.run_multi_node();
@@ -261,16 +257,13 @@ int main(int argc, char** argv) {
 
 	Hypergraph hypergraph = Hypergraph(matrix_file_format, matrix_file);
 
-	MultithreadingConfig multithreading_config = {
-		.number_of_threads_per_rank = threads_per_rank
-	};
-
-    BisectionConfig bisection_config;
+    std::unique_ptr<Bisector> bisector;
     switch (bisection_config_variant) {
     case MT_KAHYPAR:
-    	bisection_config = BisectionConfigMtKahypar {
-    		.max_imbalance = kahypar_max_imbalance,
-    	};
+    	bisector = std::make_unique<MtKahyparBisector>(
+    		kahypar_max_imbalance, 
+    		threads_per_rank
+    	);
     	break;
     default:
     	assert(false);
@@ -295,11 +288,11 @@ int main(int argc, char** argv) {
     // 4. Run actual command.
 
     if (app.got_subcommand(separator_size_test)) {
-    	run_separator_size_test(hypergraph, bisection_config, break_condition_config, multithreading_config);
+    	run_separator_size_test(hypergraph, *bisector, break_condition_config, bisection_config_variant, kahypar_max_imbalance, threads_per_rank);
     } else if (app.got_subcommand(bisection_test)) {
-    	run_bisection_test(hypergraph, bisection_config, break_condition_config, multithreading_config, output_file);
+    	run_bisection_test(hypergraph, *bisector, break_condition_config, output_file);
     } else if (app.got_subcommand(run)) {
-    	run_run(hypergraph, bisection_config, break_condition_config, multithreading_config, output_type, row_perm_file, col_perm_file);
+    	run_run(hypergraph, *bisector, break_condition_config, output_type, row_perm_file, col_perm_file);
     }
 
     MPI_Finalize();

@@ -18,7 +18,6 @@ public:
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		BisectionConfig bisection_config,
 		std::vector<int> &partition,
 		double partition_quality,
 		double true_imbalance
@@ -41,7 +40,6 @@ public:
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		BisectionConfig bisection_config,
 		std::vector<int> &partition,
 		double partition_quality,
 		double true_imbalance
@@ -72,7 +70,6 @@ public:
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		BisectionConfig bisection_config,
 		std::vector<int> &partition,
 		double partition_quality,
 		double true_imbalance
@@ -134,7 +131,6 @@ struct BisectionAttempt {
 	int range_end;
 	size_t vertex_count;
 	size_t edge_count;
-	double max_imbalance;
 	double quality;
 	double true_imbalance;
 	size_t separator_size;
@@ -144,7 +140,6 @@ struct BisectionAttempt {
 			&& this->range_end == rhs.range_end
 			&& this->vertex_count == rhs.vertex_count
 			&& this->edge_count == rhs.edge_count
-			&& this->max_imbalance == rhs.max_imbalance
 			&& this->quality == rhs.quality
 			&& this->true_imbalance == rhs.true_imbalance
 			&& this->separator_size == rhs.separator_size;
@@ -157,7 +152,6 @@ struct BisectionAttempts {
 	int range_end;
 	size_t vertex_count;
 	size_t edge_count;
-	std::vector<double> max_imbalances;
 	std::vector<double> qualities;
 	std::vector<double> true_imbalances;
 	std::vector<size_t> separator_sizes;
@@ -194,9 +188,6 @@ void print_as_json(BisectionAttempts bisection_attempts, std::ostream &os) {
 	os << "    \"range_end\": " << bisection_attempts.range_end << ",\n";
 	os << "    \"vertex_count\": " << bisection_attempts.vertex_count << ",\n";
 	os << "    \"edge_count\": " << bisection_attempts.edge_count << ",\n";
-	os << "    \"max_imbalances\": ";
-	print_as_json(bisection_attempts.max_imbalances, os);
-	os << ",\n";
 	os << "    \"qualities\": ";
 	print_as_json(bisection_attempts.qualities, os);
 	os << ",\n";
@@ -225,7 +216,7 @@ void print_as_json(std::vector<BisectionAttempts> &bas, std::ostream &os) {
 class BisectionQualityRangeLogger : public Logger {
 private:
 	constexpr static const BisectionAttempt null_value = {
-		-1, -1, -1, 0, 0, 0.0, 0.0, 0.0, 0
+		-1, -1, -1, 0, 0, 0.0, 0.0, 0
 	};
 	int node_id = -1;
 	std::vector<BisectionAttempt> bisection_attempts_by_recursion_depth;
@@ -233,15 +224,14 @@ private:
 public:
 	BisectionQualityRangeLogger() {
 		// Create a type for struct BisectionAttempt.
-		const int nitems = 9;
-		int blocklengths[nitems] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+		const int nitems = 8;
+		int blocklengths[nitems] = {1, 1, 1, 1, 1, 1, 1, 1};
 		MPI_Datatype types[nitems] = {
 			MPI_INT,
 			MPI_INT,
 			MPI_INT,
 			MPI_UNSIGNED_LONG,
 			MPI_UNSIGNED_LONG,
-			MPI_DOUBLE,
 			MPI_DOUBLE,
 			MPI_DOUBLE,
 			MPI_UNSIGNED_LONG
@@ -253,10 +243,9 @@ public:
 		offsets[2] = offsetof(BisectionAttempt, range_end);
 		offsets[3] = offsetof(BisectionAttempt, vertex_count);
 		offsets[4] = offsetof(BisectionAttempt, edge_count);
-		offsets[5] = offsetof(BisectionAttempt, max_imbalance);
-		offsets[6] = offsetof(BisectionAttempt, quality);
-		offsets[7] = offsetof(BisectionAttempt, true_imbalance);
-		offsets[8] = offsetof(BisectionAttempt, separator_size);
+		offsets[5] = offsetof(BisectionAttempt, quality);
+		offsets[6] = offsetof(BisectionAttempt, true_imbalance);
+		offsets[7] = offsetof(BisectionAttempt, separator_size);
 
 		MPI_Type_create_struct(nitems, blocklengths, offsets, types, &MPI_BISECTION_ATTEMPT_TYPE);
 		MPI_Type_commit(&MPI_BISECTION_ATTEMPT_TYPE);
@@ -268,41 +257,36 @@ public:
 		int recursion_depth,
 		int range_start,
 		int range_end,
-		BisectionConfig bisection_config,
 		std::vector<int> &partition,
 		double partition_quality,
 		double true_imbalance
 	) override {
-		BisectionConfigMtKahypar *cmk = std::get_if<BisectionConfigMtKahypar>(&bisection_config);
-		if (cmk) {
-			if (range_start == range_end) {
-				// There is only one bisection attempt.
-				return;
-			}
-
-			if (this->node_id == -1) {
-				this->node_id = node_id;
-			} else if (this->node_id != node_id) {
-				// There is one logger instance per node, so each instance should be called by one node_id only.
-				assert(false);
-			}
-			auto hb = HypergraphBisection(partition, hypergraph);
-			bisection_attempts_by_recursion_depth.resize(std::max(
-				(unsigned long) recursion_depth + 1,
-				bisection_attempts_by_recursion_depth.size()
-			));
-			bisection_attempts_by_recursion_depth[recursion_depth] = {
-				.node_id = node_id,
-				.range_start = range_start,
-				.range_end = range_end,
-				.vertex_count = hypergraph.get_vertex_count(),
-				.edge_count = hypergraph.get_edge_count(),
-				.max_imbalance = cmk->max_imbalance,
-				.quality = partition_quality,
-				.true_imbalance = true_imbalance,
-				.separator_size = hb.get_separator_size(),
-			};
+		if (range_start == range_end) {
+			// There is only one bisection attempt.
+			return;
 		}
+
+		if (this->node_id == -1) {
+			this->node_id = node_id;
+		} else if (this->node_id != node_id) {
+			// There is one logger instance per node, so each instance should be called by one node_id only.
+			assert(false);
+		}
+		auto hb = HypergraphBisection(partition, hypergraph);
+		bisection_attempts_by_recursion_depth.resize(std::max(
+			(unsigned long) recursion_depth + 1,
+			bisection_attempts_by_recursion_depth.size()
+		));
+		bisection_attempts_by_recursion_depth[recursion_depth] = {
+			.node_id = node_id,
+			.range_start = range_start,
+			.range_end = range_end,
+			.vertex_count = hypergraph.get_vertex_count(),
+			.edge_count = hypergraph.get_edge_count(),
+			.quality = partition_quality,
+			.true_imbalance = true_imbalance,
+			.separator_size = hb.get_separator_size(),
+		};
 	}
 
 	void log_best_bisection(
@@ -357,7 +341,6 @@ public:
 				if (entry == null_value) {
 					continue;
 				}
-				next.max_imbalances.push_back(entry.max_imbalance);
 				next.qualities.push_back(entry.quality);
 				next.true_imbalances.push_back(entry.true_imbalance);
 				next.separator_sizes.push_back(entry.separator_size);

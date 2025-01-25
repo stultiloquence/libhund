@@ -6,33 +6,28 @@
 #include <vector>
 #include <stdio.h>
 
-#include <mtkahypar.h>
-#include <mtkahypartypes.h>
 #include <mpi.h>
 
 #include <hypergraph.h>
+#include <bisector.h>
 #include <types.h>
 #include <hypergraph_bisection.h>
 #include <util.h>
 #include <logger.h>
-#include <initialize_mt_kahypar.h>
 
-struct Partition {
-	std::vector<int> partition;
-	double quality; // Despite the name, smaller qualities indicate a better bisection
-	double true_imbalance;
-};
-
+/**
+ * This class represents one configured instance of a HUND computation. It is
+ * completely configured through its constructor. After construction, the com-
+ * putation can be run both on a single node or on sevaral nodes.
+ */
 class HUNDComputation {
 
 private:
 	// Configuration Objects
-	BisectionConfig bisection_config;
+	Bisector &bisector;
 	BreakConditionConfig break_condition_config;
 	inline static NoOpLogger default_logger = NoOpLogger();
 	Logger &logger;
-
-	mt_kahypar_context_t* mt_kahypar_context;
 
 	MPI_Comm MPI_COMM_ROOT;
 	int mpi_node_id;
@@ -40,42 +35,6 @@ private:
 
 	// Hypergraph Data
 	Hypergraph &hypergraph;
-
-	Partition bisect(
-		Hypergraph hypergraph
-	) {
-		BisectionConfigMtKahypar *cmk = std::get_if<BisectionConfigMtKahypar>(&bisection_config);
-		if (cmk) {
-			auto mt_hypergraph = mt_kahypar_create_hypergraph(
-				DETERMINISTIC,
-				hypergraph.get_vertex_count(),
-				hypergraph.get_edge_count(),
-				hypergraph.hyperedge_indices.data(),
-				hypergraph.hyperedges.data(),
-				nullptr,
-				nullptr
-			);
-			auto partitioned_hg = mt_kahypar_partition(mt_hypergraph, mt_kahypar_context);
-
-			auto partition = std::make_unique<mt_kahypar_partition_id_t[]>(mt_kahypar_num_hypernodes(mt_hypergraph));
-			mt_kahypar_get_partition(partitioned_hg, partition.get());
-
-			auto result = std::vector(partition.get(), partition.get() + hypergraph.get_vertex_count());
-			double quality = mt_kahypar_km1(partitioned_hg);
-
-			auto true_imbalance = mt_kahypar_imbalance(partitioned_hg, mt_kahypar_context);
-			mt_kahypar_free_hypergraph(mt_hypergraph);
-			mt_kahypar_free_partitioned_hypergraph(partitioned_hg);
-			return {
-				.partition = result,
-				.quality = quality,
-				.true_imbalance = true_imbalance,
-			};
-		}
-
-		assert(false); // Should not happen;
-		return {};
-	}
 
 	bool break_condition_reached(
 		Hypergraph hypergraph,
@@ -105,9 +64,9 @@ private:
 			};
 		}
 
-		auto partition = HUNDComputation::bisect(hypergraph);
+		auto partition = bisector.bisect(hypergraph);
 
-		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, bisection_config, partition.partition, partition.quality, partition.true_imbalance);
+		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, mpi_node_id, mpi_node_id, partition.partition, partition.quality, partition.true_imbalance);
 
 		auto hb = HypergraphBisection(partition.partition, hypergraph);
 
@@ -158,9 +117,9 @@ private:
 
 		// todo: 1. figure out your node's bisection parameter variation
 		// 2. compute partition and quality
-		auto partition = HUNDComputation::bisect(hypergraph);
+		auto partition = bisector.bisect(hypergraph);
 
-		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, bisection_config, partition.partition, partition.quality, partition.true_imbalance);
+		logger.log_potential_partition(mpi_node_id, hypergraph, recursion_depth, range_start, range_end, partition.partition, partition.quality, partition.true_imbalance);
 
 		// 3. communicate qualities to all other nodes working on this bisection.
 		int range_size = range_end - range_start;
@@ -305,37 +264,32 @@ private:
 
 
 public:
+	/**
+	 * Delegates to the main constructor using a default, noop logger.
+	 */
 	HUNDComputation(
-		BisectionConfig bc,
+		Bisector &bisector,
 		BreakConditionConfig bcc,
-		MultithreadingConfig mc,
 		Hypergraph &hypergraph
-	) : HUNDComputation(bc, bcc, mc, hypergraph, default_logger) { }
+	) : HUNDComputation(bisector, bcc, hypergraph, default_logger) { }
 
+	/**
+	 * Constructs a fully configured instance of a HUND computation that
+	 * is ready to be run.
+	 * 
+	 * @param bc Determines what bisection algorithm is used and contains
+	 *     additional configuration of that algorithm, based on 
+	 */
 	HUNDComputation(
-		BisectionConfig bc,
+		Bisector &bisector,
 		BreakConditionConfig bcc,
-		MultithreadingConfig mc,
 		Hypergraph &hypergraph,
 		Logger &logger
-	) : logger(logger), hypergraph(hypergraph) {
-		this->bisection_config = bc;
-		this->break_condition_config = bcc;
-
-		BisectionConfigMtKahypar *cmk = std::get_if<BisectionConfigMtKahypar>(&bc);
-		if (cmk) {
-			initialize_mt_kahypar(mc.number_of_threads_per_rank);
-			mt_kahypar_context = mt_kahypar_context_new();
-			mt_kahypar_load_preset(mt_kahypar_context, DEFAULT);
-			mt_kahypar_set_partitioning_parameters(
-				mt_kahypar_context,
-				2 /* number of blocks */,
-				cmk->max_imbalance,
-				KM1
-			);
-			mt_kahypar_set_context_parameter(mt_kahypar_context, VERBOSE, "0");
-		}
-
+	) : bisector(bisector),
+		break_condition_config(bcc),
+		logger(logger),
+		hypergraph(hypergraph)
+	{
 		MPI_Comm_dup(MPI_COMM_WORLD, &MPI_COMM_ROOT);
 	    MPI_Comm_size(MPI_COMM_ROOT, &mpi_nr_of_nodes);
 	    MPI_Comm_rank(MPI_COMM_ROOT, &mpi_node_id);
@@ -344,21 +298,11 @@ public:
 	    assert(0 <= mpi_node_id && mpi_node_id < mpi_nr_of_nodes);
 	}
 
-	~HUNDComputation() {
-		if (std::holds_alternative<BisectionConfigMtKahypar>(bisection_config)) {
-			mt_kahypar_free_context(mt_kahypar_context);
-		}
-	};
-
 	RowColPermutation run_single_node() {
 		return run_single_node(hypergraph, 0);
 	}
 
 	RowColPermutation run_multi_node() {
 		return run_multi_node(hypergraph, 0, 0, mpi_nr_of_nodes, MPI_COMM_ROOT);
-	}
-
-	Hypergraph getHypergraph() {
-		return hypergraph;
 	}
 };
