@@ -26,15 +26,15 @@ public:
 
 	 * @param max_imbalance Maximum imbalance of the two partitions of the
 	 *     bisection.
-	 * @param nr_of_blocks Number of blocks to dissect the hypergraph into.
 	 * @param number_of_threads Number of threads used for multi-threading. A
 	 *     value of 0 uses the maximum number available.
+	 * @param nr_of_blocks Number of blocks to dissect the hypergraph into.
 	 * @param hypergraph The hypergraph to be dissected. 
 	 */
 	KahyparComputation(
 		double max_imbalance,
-		int nr_of_blocks,
 		int number_of_threads,
+		int nr_of_blocks,
 		Hypergraph &hypergraph
 	) : hypergraph(hypergraph) {
 		initialize_mt_kahypar(number_of_threads);
@@ -50,10 +50,10 @@ public:
 		mt_kahypar_set_context_parameter(mt_kahypar_context, VERBOSE, "0");
 	}
 
-		/**
-		 * Destrcutor that makes sure that the Mt-KaHyPar library exits 
-		 * cleanly.
-		 */
+	/**
+	 * Destructor that makes sure that the Mt-KaHyPar library exits 
+	 * cleanly.
+	 */
 	~KahyparComputation() {
 		mt_kahypar_free_context(mt_kahypar_context);
 	};
@@ -67,7 +67,7 @@ public:
 	 * the same length as the hypergraph has vertices. The value for each index
 	 * indicates which partition that vertex has been dissected into.
 	 */
-	std::vector<int> bisect() {
+	std::vector<int> dissect() {
 		auto mt_hypergraph = mt_kahypar_create_hypergraph(
 			DETERMINISTIC,
 			hypergraph.get_vertex_count(),
@@ -91,49 +91,6 @@ public:
 		mt_kahypar_free_partitioned_hypergraph(partitioned_hg);
 
 		return result;
-	}
-
-	/**
-	 * Compute the size of the separator from a given partition, by adding up 
-	 * all hyperedges that are in more than one partition. 
-	 * 
-	 * @param partition Paritition of the vertices.
-	 * @return unsigned long Combined size of all separators.
-	 */
-	unsigned long size_of_separator(
-		std::vector<int> partition
-	) {
-		unsigned long result = 0;
-		auto edge_count = hypergraph.get_edge_count();
-		for (size_t i = 0; i < edge_count; i++) {
-			size_t edge_start = hypergraph.hyperedge_indices[i];
-			size_t edge_end = hypergraph.hyperedge_indices[i + 1];
-
-			if (edge_start == edge_end) {
-				continue;
-			}
-
-			unsigned long first_vertex = hypergraph.hyperedges[edge_start];
-			int hyperedge_partition = partition[first_vertex];
-			
-			for (size_t j = edge_start + 1; j < edge_end; j++) {
-				unsigned long vertex = hypergraph.hyperedges[j];
-				if (hyperedge_partition != partition[vertex]) {
-					result += 1;
-					break;
-				}
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Compute the size of the separator by first bisecting and then adding up 
-	 * all hyperedges that are in more than one partition. 
-	 * @return unsigned long Combined size of all separators.
-	 */
-	unsigned long size_of_separator() {
-		return size_of_separator(bisect());
 	}
 
 	/**

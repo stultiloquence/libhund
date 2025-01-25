@@ -67,7 +67,7 @@ void run_separator_size_test(
 		nr_of_blocks,
 		hypergraph
 	);
-	auto kahypar_size = kahypar_computation.size_of_separator();
+	kahypar_computation.dissect();
 	auto kahypar_cut = kahypar_computation.get_cut();
 	auto kahypar_km1 = kahypar_computation.get_km1();
 	auto kahypar_soed = kahypar_computation.get_soed();
@@ -76,8 +76,7 @@ void run_separator_size_test(
 	if (node_id == 0) {
 		printf("HUND total size of separators:          %lu\n", hund_size);
 		printf("HUND total size of separators weighted: %lu\n", hund_size_weighted);
-		printf("MtKaHyPar size of separator:            %lu\n", kahypar_size);
-		printf("MtKaHyPar CUT:                          %f\n", kahypar_cut);
+		printf("MtKaHyPar size of separator (=CUT):     %f\n", kahypar_cut);
 		printf("MtKaHyPar KM1:                          %f\n", kahypar_km1);
 		printf("MtKaHyPar SOED:                         %f\n", kahypar_soed);
 	}
