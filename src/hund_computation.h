@@ -36,8 +36,16 @@ private:
 	// Hypergraph Data
 	Hypergraph &hypergraph;
 
+	/**
+	 * Checks whether the recursion break condition configured through the
+	 * BreakConditionConfig constructor parameter has been reached for the
+	 * given hypergraph at the given recursion_depth.
+	 * @param hypergraph The (sub)hypergraph that is to be potentially bisected
+	 *     further.
+	 * @param recursion_depth The current recursion depth, starting at 0.
+	 */
 	bool break_condition_reached(
-		Hypergraph hypergraph,
+		Hypergraph &hypergraph,
 		int recursion_depth
 	) {
 		if (std::holds_alternative<BreakConditionConfigRecursionDepth>(break_condition_config)) {
@@ -53,6 +61,16 @@ private:
 		}
 	}
 
+	/**
+	 * Recursive helper function that runs the HUND algorithm recursively on a
+	 * single node.
+	 * @param hypergraph The hypergraph to be partitioned into blocks.
+	 * @param recursion_depth The current recursion depth, starting at 0.
+	 * @return A row (vertex) and column (edge) permutation. When applied to
+	 *     the matrix represented by the given hypergraph, they permute it into
+	 *     a matrix that has a structure desirable for subsequent
+	 *     LU decomposition.
+	 */
 	RowColPermutation run_single_node(
 		Hypergraph hypergraph,
 		int recursion_depth
@@ -94,6 +112,23 @@ private:
 		};
 	}
 
+	/**
+	 * Recursive helper function that runs the HUND algorithm recursively on
+	 * a set of MPI nodes.
+	 * @param hypergraph The hypergraph to be partitioned into blocks.
+	 * @param recursion_depth The current recursion depth, starting at 0.
+	 * @param range_start The first (inclusive) MPI node id in the
+	 *     HundComputation's (global) MPI_Comm.
+	 * @param range_start The last (exclusive) MPI node id in the
+	 *     HundComputation's (global) MPI_Comm.
+	 * @param RANGE_COMM A subcommunicator of the global HUNDComputation's
+	 *     MPI_Comm that include exactly the node's in [range_start, range_end[.
+	 * @param recursion_depth The current recursion depth, starting at 0.
+	 * @return A row (vertex) and column (edge) permutation. When applied to
+	 *     the matrix represented by the given hypergraph, they permute it into
+	 *     a matrix that has a structure desirable for subsequent
+	 *     LU decomposition.
+	 */
 	RowColPermutation run_multi_node(
 		Hypergraph hypergraph,
 		int recursion_depth,
@@ -277,8 +312,16 @@ public:
 	 * Constructs a fully configured instance of a HUND computation that
 	 * is ready to be run.
 	 * 
-	 * @param bc Determines what bisection algorithm is used and contains
-	 *     additional configuration of that algorithm, based on 
+	 * @param bisector The bisection algorithm to be used during the HUND
+	 *     algorithm.
+	 * @param bcc Configures the break condition of the HUND computation.
+	 * @param hypergraph The hypergraph that the HUND algorithm should be
+	 *     applied to.
+	 * @param logger To inspect the computation, it is possible to pass a
+	 *     logger that is called at various points during the algorithm.
+	 *     Incurs no performance penalty when the NoopLogger is passed,
+	 *     which is the default when one is interested in just running the
+	 *     algorithm.
 	 */
 	HUNDComputation(
 		Bisector &bisector,
@@ -298,10 +341,28 @@ public:
 	    assert(0 <= mpi_node_id && mpi_node_id < mpi_nr_of_nodes);
 	}
 
+	/**
+	 * Runs the HUND algorithm recursively on a single node.
+	 * @param hypergraph The hypergraph to be partitioned into blocks.
+	 * @param recursion_depth The current recursion depth, starting at 0.
+	 * @return A row (vertex) and column (edge) permutation. When applied to
+	 *     the matrix represented by the given hypergraph, they permute it into
+	 *     a matrix that has a structure desirable for subsequent
+	 *     LU decomposition.
+	 */
 	RowColPermutation run_single_node() {
 		return run_single_node(hypergraph, 0);
 	}
 
+	/**
+	 * Runs the HUND algorithm recursively on multiple nodes.
+	 * @param hypergraph The hypergraph to be partitioned into blocks.
+	 * @param recursion_depth The current recursion depth, starting at 0.
+	 * @return A row (vertex) and column (edge) permutation. When applied to
+	 *     the matrix represented by the given hypergraph, they permute it into
+	 *     a matrix that has a structure desirable for subsequent
+	 *     LU decomposition.
+	 */
 	RowColPermutation run_multi_node() {
 		return run_multi_node(hypergraph, 0, 0, mpi_nr_of_nodes, MPI_COMM_ROOT);
 	}
