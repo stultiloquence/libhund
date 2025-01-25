@@ -5,7 +5,6 @@
 #include <CLI11/CLI11.hpp>
 #include <mtkahypar.h>
 
-#include <types.h>
 #include <hund_computation.h>
 #include <kahypar_computation.h>
 

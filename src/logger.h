@@ -6,7 +6,6 @@
 
 #include <mpi.h>
 
-#include <types.h>
 #include <bisector.h>
 #include <hypergraph_bisection.h>
 #include <hypergraph.h>

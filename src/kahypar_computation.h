@@ -2,7 +2,6 @@
  
 #include <mtkahypar.h>
 #include <mtkahypartypes.h>
-#include <types.h>
 #include <hypergraph.h>
 #include <initialize_mt_kahypar.h>
 

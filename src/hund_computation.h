@@ -10,7 +10,6 @@
 
 #include <hypergraph.h>
 #include <bisector.h>
-#include <types.h>
 #include <hypergraph_bisection.h>
 #include <util.h>
 #include <logger.h>
