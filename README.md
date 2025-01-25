@@ -15,7 +15,9 @@ hwloc/2.7.1
 OpenMPI/4.1.4
 ```
 On the RWTH HPC compute cluster, this is accomplished by executing the command `module load GCC/11.3.0 Boost/1.79.0 tbb/2021.5.0 hwloc/2.7.1 OpenMPI/4.1.4`.
+
 2. Clone the repository: `git clone https://stultiloquence/libhund && cd libhund`.
+
 3. Install [mt-kahypar](https://github.com/kahypar/mt-kahypar) library into `external/mt-kahypar` following their instructions. Briefly:
 	1. `cd external`
 	2. `git clone https://github.com/kahypar/mt-kahypar`
@@ -34,7 +36,7 @@ After completing the steps under Installation, you can build the CLI through run
 
 ### Using the CLI Locally
 
-Since the `mt-kahypar` library is dynamically linked, you first need to tell the linker where the library can be found
+Since the `mt-kahypar` library is dynamically linked, you first need to tell the linker where the library can be found:
 
 ```
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(realpath ./external/mt-kahypar/build/lib/)
@@ -79,7 +81,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(realpath ./external/mt-kahypar/build/l
 module load GCC/11.3.0 Boost/1.79.0 tbb/2021.5.0 hwloc/2.7.1 OpenMPI/4.1.4
 ```
 
-and then invoke `hundcli` like you would locally
+and then invoke `hundcli` like you would locally.
 
 To instead run the algorithm as a SLURM job, you can use and modify the example SLURM script `deploy/example_submit.sh`.
 
