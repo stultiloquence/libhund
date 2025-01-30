@@ -42,14 +42,14 @@ enum BreakConditionVariant {
  * @param break_condition_config The break condition for the HUNDComputation. Must
  *     be an instance of BreakConditionConfigRecursionDepth.
  * @param kahypar_max_imbalance Maximum imbalance passed to the KahyparComputation.
- * @param threads_per_rank Number of threads the KahyparComputation should use.
+ * @param kahypar_threads Number of threads the KahyparComputation should use.
  */
 void run_separator_size_test(
 	Hypergraph hypergraph,
 	Bisector &bisector,
 	BreakConditionConfig break_condition_config,
 	double kahypar_max_imbalance,
-	int threads_per_rank
+	int kahypar_threads
 ) {
 	// Get the configuration right.
 	BreakConditionConfigRecursionDepth *crd = std::get_if<BreakConditionConfigRecursionDepth>(&break_condition_config);
@@ -83,7 +83,7 @@ void run_separator_size_test(
 	// Run KahyparComputation.
 	KahyparComputation kahypar_computation(
 		kahypar_max_imbalance,
-		threads_per_rank,
+		kahypar_threads,
 		nr_of_blocks,
 		hypergraph
 	);
@@ -222,10 +222,6 @@ int main(int argc, char** argv) {
     CLI::App app{"HUND CLI"};
     argv = app.ensure_utf8(argv);
 
-    int threads_per_rank = 0;
-    app.add_option("-t,--threads-per-rank", threads_per_rank, "Number of threads per MPI rank. Default is 0, which means use the maximum number available.")
-    	->check(CLI::NonNegativeNumber);
-
     std::string matrix_file = "matrix.mtx";
     app.add_option("-f,--matrix-file", matrix_file, "File path of the input matrix file.")
     	->group("Input options")
@@ -248,6 +244,11 @@ int main(int argc, char** argv) {
 	app.add_option("--kahypar-max-imbalance", kahypar_max_imbalance, "Maximum imbalance passed as a parameter to the MT_KAHYPAR bisection method. Only has an effect if --bisection-method is set to MT_KAHYPAR. Default value is 0.03.")
     	->group("Bisection options")
     	->check(CLI::PositiveNumber);
+
+    int kahypar_threads = 0;
+    app.add_option("--kahypar-threads", kahypar_threads, "Number of threads per MPI rank when using MtKaHyPar. Default is 0, which means use the maximum number available.")
+    	->group("Bisection options")
+    	->check(CLI::NonNegativeNumber);
 
    	std::map<std::string, BreakConditionVariant> break_condition_variant_map{{"RECURSION_DEPTH", RECURSION_DEPTH}, {"BLOCK_SIZE", BLOCK_SIZE}};
     BreakConditionVariant break_condition_variant = BLOCK_SIZE;
@@ -290,7 +291,7 @@ int main(int argc, char** argv) {
 
     app.footer("EXAMPLES\n"
 		"hundcli \\\n"
-		"    --matrix-file=examples/paper_example.mtx --matrix-file-format=MATRIX_MARKET\\n"
+		"    --matrix-file=examples/paper_example.mtx --matrix-file-format=MATRIX_MARKET\\\n"
 		"    --bisection-method=MT_KAHYPAR --kahypar-max-imbalance=0.05 \\\n"
 		"    --break-condition=BLOCK_SIZE --block-size=2 \\\n"
 		"    run --output-type=FILES --row-file=results/rows.txt --col-file=result/cols.txt"
@@ -314,7 +315,7 @@ int main(int argc, char** argv) {
     case MT_KAHYPAR:
     	bisector = std::make_unique<MtKahyparBisector>(
     		kahypar_max_imbalance, 
-    		threads_per_rank
+    		kahypar_threads
     	);
     	break;
     default:
@@ -340,7 +341,7 @@ int main(int argc, char** argv) {
     // 4. Run actual command.
 
     if (app.got_subcommand(separator_size_test)) {
-    	run_separator_size_test(hypergraph, *bisector, break_condition_config, kahypar_max_imbalance, threads_per_rank);
+    	run_separator_size_test(hypergraph, *bisector, break_condition_config, kahypar_max_imbalance, kahypar_threads);
     } else if (app.got_subcommand(bisection_test)) {
     	run_bisection_test(hypergraph, *bisector, break_condition_config, output_file);
     } else if (app.got_subcommand(run)) {

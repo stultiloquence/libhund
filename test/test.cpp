@@ -47,7 +47,7 @@ TEST_CASE("Obvious block structure is identified", "[correctness]") {
 TEST_CASE("Time to run on real life matrix", "[performance]") {
     const int recursion_depth = 3;
     const int nr_of_blocks = pow(2, recursion_depth);
-    const double max_imbalance = 0.03;
+    const double max_imbalance = 0.05;
 
     auto hypergraph = Hypergraph(MATRIX_MARKET, "../examples/fd18.mtx");
 
@@ -66,8 +66,8 @@ TEST_CASE("Time to run on real life matrix", "[performance]") {
 
     KahyparComputation kahypar_computation(
         max_imbalance,
-        nr_of_blocks,
         0,
+        nr_of_blocks,
         hypergraph
     );
 
